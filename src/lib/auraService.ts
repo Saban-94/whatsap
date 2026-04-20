@@ -28,7 +28,7 @@ export const processNoaTurn = async (userText: string, user: any) => {
   const prompt = `
 Current Time: ${currentDateTime}
 Day: ${dayName}
-User Name: ${displayName}
+Current User: ${displayName}
 Message: ${userText}
 `;
 
@@ -57,6 +57,7 @@ Message: ${userText}
           if (cleanStatus) {
             q = query(ordersRef, where('status', '==', cleanStatus));
           } else {
+            // Fetch a broad set to ensure we find "preparing" etc, and allow fuzzy matching
             q = query(ordersRef, limit(300));
           }
           
@@ -77,7 +78,6 @@ Message: ${userText}
           
           if (cleanQuery) {
             const lowerQuery = cleanQuery.toLowerCase();
-            // Slug-like comparison: take first word or clean string
             const searchSlug = lowerQuery.split(/[\s\-/]/)[0]; 
 
             results = results.filter((r: any) => {
@@ -107,12 +107,12 @@ Message: ${userText}
           }
 
           if (!result && customerName) {
-            // Fallback to fuzzy search by name to find the right doc
             const lowerCName = customerName.toLowerCase();
             const searchSlug = lowerCName.split(/[\s\-/]/)[0];
             const snap = await getDocs(query(collection(db, 'orders'), limit(300)));
             const match = snap.docs.find(d => {
-              const name = ((d.data() as any).customerName || (d.data() as any).customer || '').toLowerCase();
+              const data = d.data() as any;
+              const name = (data.customerName || data.customer || '').toLowerCase();
               return name.includes(lowerCName) || name.includes(searchSlug);
             });
             if (match) {
