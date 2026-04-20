@@ -328,6 +328,8 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onSendFile, onSend
   const [text, setText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -390,9 +392,23 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onSendFile, onSend
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      onSendFile(file);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setPendingFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
     }
+  };
+
+  const handleConfirmSend = () => {
+    if (pendingFile) {
+      onSendFile(pendingFile);
+      clearPendingFile();
+    }
+  };
+
+  const clearPendingFile = () => {
+    setPendingFile(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const formatDuration = (sec: number) => {
@@ -402,70 +418,124 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onSendFile, onSend
   };
 
   return (
-    <div className="bg-[#f0f2f5] min-h-[62px] py-2 px-3 flex items-center gap-3 sticky bottom-0 z-10 border-t border-gray-300">
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        className="hidden" 
-        onChange={handleFileChange}
-      />
-      {!isRecording ? (
-        <>
-          <div className="flex gap-3 text-[#54656f]">
-            <Smile className="w-6 h-6 cursor-pointer" />
-            <Paperclip 
-              className="w-6 h-6 cursor-pointer" 
-              onClick={() => fileInputRef.current?.click()}
-            />
-          </div>
-          <div className="flex-1 relative">
-            <input 
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="הקלד הודעה"
-              className="w-full bg-white rounded-lg px-4 py-2 text-sm focus:outline-none placeholder:text-gray-500 shadow-sm"
-            />
-            {isTyping && (
-              <div className="absolute -top-6 right-2 text-[10px] italic text-[#00a884] font-medium bg-[#f0f2f5] px-2 rounded-full animate-pulse">
-                נועה מקלידה...
+    <div className="bg-[#f0f2f5] min-h-[62px] py-2 px-3 flex flex-col gap-2 sticky bottom-0 z-10 border-t border-gray-300">
+      <AnimatePresence>
+        {pendingFile && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="absolute bottom-full left-0 right-0 p-4 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-2xl flex flex-col gap-4 z-50 rounded-t-2xl"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-700">תצוגה מקדימה לפני שליחה</h3>
+              <button onClick={clearPendingFile} className="p-1 hover:bg-gray-100 rounded-full">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100 max-h-[40vh] overflow-hidden">
+              {pendingFile.type.startsWith('image/') ? (
+                <img src={previewUrl!} alt="Preview" className="w-24 h-24 object-cover rounded shadow-sm border border-white" />
+              ) : pendingFile.type === 'application/pdf' ? (
+                <div className="w-24 h-24 bg-red-50 rounded flex items-center justify-center text-red-500">
+                  <FileText className="w-12 h-12" />
+                </div>
+              ) : (
+                <div className="w-24 h-24 bg-[#00a884]/10 rounded flex items-center justify-center text-[#00a884]">
+                  <FileText className="w-12 h-12" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{pendingFile.name}</p>
+                <p className="text-xs text-gray-500">{(pendingFile.size / 1024 / 1024).toFixed(2)} MB</p>
               </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={clearPendingFile}
+                className="flex-1 py-3 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                ביטול
+              </button>
+              <button 
+                onClick={handleConfirmSend}
+                className="flex-[2] py-3 text-sm font-medium text-white bg-[#00a884] hover:bg-[#008f72] rounded-xl shadow-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                שלח קובץ
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="flex items-center gap-3">
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          className="hidden" 
+          onChange={handleFileChange}
+        />
+        {!isRecording ? (
+          <>
+            <div className="flex gap-3 text-[#54656f]">
+              <Smile className="w-6 h-6 cursor-pointer" />
+              <Paperclip 
+                className="w-6 h-6 cursor-pointer" 
+                onClick={() => fileInputRef.current?.click()}
+              />
+            </div>
+            <div className="flex-1 relative">
+              <input 
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                placeholder="הקלד הודעה"
+                className="w-full bg-white rounded-lg px-4 py-2 text-sm focus:outline-none placeholder:text-gray-500 shadow-sm"
+              />
+              {isTyping && (
+                <div className="absolute -top-6 right-2 text-[10px] italic text-[#00a884] font-medium bg-[#f0f2f5] px-2 rounded-full animate-pulse">
+                  נועה מקלידה...
+                </div>
+              )}
+            </div>
+            {text.trim() ? (
+              <Send 
+                onClick={handleSend}
+                className="w-6 h-6 text-[#00a884] cursor-pointer" 
+              />
+            ) : (
+              <Mic 
+                onClick={startRecording}
+                className="w-6 h-6 text-[#54656f] cursor-pointer hover:text-[#00a884] transition-colors" 
+              />
             )}
-          </div>
-          {text.trim() ? (
-            <Send 
-              onClick={handleSend}
-              className="w-6 h-6 text-[#00a884] cursor-pointer" 
-            />
-          ) : (
-            <Mic 
-              onClick={startRecording}
-              className="w-6 h-6 text-[#54656f] cursor-pointer hover:text-[#00a884] transition-colors" 
-            />
-          )}
-        </>
-      ) : (
-        <div className="flex-1 flex items-center justify-between bg-white rounded-lg px-4 py-2 border border-red-100 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-sm font-mono text-gray-700">{formatDuration(recordingDuration)}</span>
-          </div>
-          <p className="text-xs text-gray-400">הקלטה פעילה...</p>
-          <div className="flex items-center gap-4">
-            <Trash2 
-              onClick={cancelRecording}
-              className="w-5 h-5 text-gray-400 cursor-pointer hover:text-red-500 transition-colors" 
-            />
-            <div className="w-[1px] h-4 bg-gray-200" />
-            <div 
-              onClick={stopRecording}
-              className="w-8 h-8 bg-[#00a884] rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-[#008f72] transition-colors"
-            >
-              <Send className="w-4 h-4 text-white" />
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-between bg-white rounded-lg px-4 py-2 border border-red-100 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-sm font-mono text-gray-700">{formatDuration(recordingDuration)}</span>
+            </div>
+            <p className="text-xs text-gray-400">הקלטה פעילה...</p>
+            <div className="flex items-center gap-4">
+              <Trash2 
+                onClick={cancelRecording}
+                className="w-5 h-5 text-gray-400 cursor-pointer hover:text-red-500 transition-colors" 
+              />
+              <div className="w-[1px] h-4 bg-gray-200" />
+              <div 
+                onClick={stopRecording}
+                className="w-8 h-8 bg-[#00a884] rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-[#008f72] transition-colors"
+              >
+                <Send className="w-4 h-4 text-white" />
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
