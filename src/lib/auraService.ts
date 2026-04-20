@@ -41,7 +41,7 @@ export const processNoaTurn = async (userText: string, user: any, history: Messa
   // Fetch staff "Black Box" rules
   let blackBoxRules = "";
   try {
-    const staffSnap = await getDocs(query(collection(db, 'staff'), where('email', '==', user.email)));
+    const staffSnap = await getDocs(query(collection(db, 'profiles'), where('email', '==', user.email)));
     if (!staffSnap.empty) {
       blackBoxRules = staffSnap.docs[0].data().introductionRules || "";
     }
@@ -119,6 +119,7 @@ Message: ${userText}
           const snap = await getDocs(q);
           let results = snap.docs.map(d => {
             const data = d.data() as any;
+            const customerName = data.customerName || data.customer || 'לקוח לא ידוע';
             
             // Robust mapping: try multiple variations just in case
             const rawItemsData = data.items || data.Items || data.item_list || data.list;
@@ -131,7 +132,8 @@ Message: ${userText}
             
             return {
               id: d.id,
-              customer: data.customerName || data.customer || 'לקוח לא ידוע',
+              customer: customerName,
+              customerName: customerName, // REDUNDANCY
               destination: data.destination || 'יעד לא צוין',
               warehouse: data.warehouse || 'מחסן כללי',
               status: data.status || 'pending',
@@ -196,10 +198,13 @@ Message: ${userText}
             // Raw String Injection for items
             const rawItems = Array.isArray(rawItemsData) ? rawItemsData.join(', ') : (rawItemsData || "לא הוזנו פריטים");
             
+            const cName = orderData.customerName || orderData.customer || 'לקוח לא ידוע';
+            
             // Flat Tool Response as requested: { items, customer, orderId }
             const flatResult = {
               items: rawItems,
-              customer: orderData.customerName || orderData.customer || 'לקוח לא ידוע',
+              customer: cName,
+              customerName: cName, // REDUNDANCY
               orderId: orderData.id,
               destination: orderData.destination,
               status: orderData.status,
@@ -249,7 +254,8 @@ Message: ${userText}
           const itemsStr = Array.isArray(items) ? items.join(', ') : (items || "לא הוזנו פריטים");
 
           const docRef = await addDoc(collection(db, 'orders'), {
-            customerName: customer,
+            customer: customer || 'לקוח לא ידוע',
+            customerName: customer || 'לקוח לא ידוע', // Sync both
             items: itemsStr,
             status: 'pending',
             createdBy: 'noa',
@@ -313,8 +319,10 @@ Message: ${userText}
               id: (call as any).id 
             });
           } else {
+            const cName = customerName || 'לקוח לא ידוע';
             const docRef = await addDoc(collection(db, 'orders'), {
-              customerName,
+              customer: cName,
+              customerName: cName,
               items,
               destination,
               orderNumber,

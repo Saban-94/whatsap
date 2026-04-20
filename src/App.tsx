@@ -410,13 +410,39 @@ export default function App() {
           const orderTime = order.createdAt?.toMillis() || 0;
           const now = Date.now();
           
-          // Only notify for fresh orders (last 30 seconds) not created by Noa itself to avoid loops
           if (now - orderTime < 30000 && order.createdBy !== 'noa') {
             const chatId = `chat_${user.uid}_noa`;
+            const customerDisplay = order.customerName || order.customer || 'לקוח לא ידוע';
             
-            // Add automatic Noa message to chat (WhatsApp Interface Simulation)
+            // Check for Itzik's profile to personalize
+            let noaMessage = `📢 [Saban Messenger - קבוצת נהגים]\n\n🚀 ראמי נשמה, נכנסה הזמנה חדשה בסידור!\n\n🔹 לקוח: ${customerDisplay}\n🔹 פריטים: ${Array.isArray(order.items) ? order.items.join(', ') : (order.items || 'לא צוין')}\n🔹 יעד: ${order.destination || 'ממתין לעדכון'}\n\nהמערכת בודקת כרגע זמינות נהגים...`;
+            
+            try {
+              const profileSnap = await getDocs(query(collection(db, 'profiles'), where('email', '==', user.email)));
+              if (!profileSnap.empty) {
+                const profile = profileSnap.docs[0].data();
+                if (profile.name.includes('איציק')) {
+                  noaMessage = `איציק, רשמתי לך ביומן להכין את הציוד ל${customerDisplay} (${order.items || ''}) לשעה הקרובה.`;
+                  
+                  // Auto-create calendar event in reminders as well
+                  await addDoc(collection(db, 'reminders'), {
+                    summary: `הכנת ציוד: ${customerDisplay}`,
+                    description: `פריטים: ${order.items || ''}`,
+                    startTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
+                    userEmail: user.email,
+                    status: 'pending',
+                    reminderSent: false,
+                    createdAt: serverTimestamp()
+                  });
+                }
+              }
+            } catch (err) {
+              console.warn("Could not fetch profile for personalized messaging", err);
+            }
+
+            // Add automatic Noa message to chat
             await addDoc(collection(db, 'chats', chatId, 'messages'), {
-              text: `📢 [הזמנה חדשה  - קבוצת סידור]\n\n🚀 ראמי נשמה, נכנסה הזמנה חדשה בסידור!\n\n🔹 לקוח: ${order.customer}\n🔹 פריטים: ${Array.isArray(order.items) ? order.items.join(', ') : (order.items || 'לא צוין')}\n🔹 יעד: ${order.destination || 'ממתין לעדכון'}\n\nהמערכת בודקת כרגע זמינות נהגים...`,
+              text: noaMessage,
               senderId: 'noa',
               senderName: 'Saban Messenger',
               status: 'sent',
@@ -427,7 +453,7 @@ export default function App() {
             // Native Push Notification Simulation
             if ("Notification" in window && Notification.permission === "granted") {
               new Notification("Saban Messenger (WhatsApp)", {
-                body: `הזמנה חדשה מ-${order.customer} - ${order.destination || ''}`,
+                body: `הזמנה חדשה מ-${customerDisplay} - ${order.destination || ''}`,
                 icon: "https://picsum.photos/seed/sabanos/192/192"
               });
             }
@@ -439,6 +465,53 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
   
+  // Calendar Reminder Engine
+  useEffect(() => {
+    if (!user) return;
+    
+    const checkReminders = async () => {
+      try {
+        const now = new Date();
+        const futureLimit = new Date(now.getTime() + 35 * 60000); // 35 minutes from now
+        
+        const q = query(
+          collection(db, 'reminders'),
+          where('userEmail', '==', user.email),
+          where('status', '==', 'pending'),
+          where('reminderSent', '==', false)
+        );
+        
+        const snap = await getDocs(q);
+        for (const docRef of snap.docs) {
+          const reminder = docRef.data();
+          const startTime = new Date(reminder.startTime);
+          
+          // If within 30-35 mins window
+          if (startTime > now && startTime <= futureLimit) {
+            const chatId = `chat_${user.uid}_noa`;
+            
+            await addDoc(collection(db, 'chats', chatId, 'messages'), {
+              text: `⏰ *תזכורת יומן:* איציק, עוד חצי שעה יש לך: ${reminder.summary}\n\n${reminder.description || ''}`,
+              senderId: 'noa',
+              senderName: 'Noa AI Reminders',
+              status: 'sent',
+              type: 'text',
+              createdAt: serverTimestamp()
+            });
+            
+            await updateDoc(docRef.ref, { reminderSent: true });
+            playAICompletion();
+          }
+        }
+      } catch (err) {
+        console.error("Reminder engine error:", err);
+      }
+    };
+
+    const interval = setInterval(checkReminders, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [user]);
+
   // Sound effects
   const playTick = () => {
     const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');

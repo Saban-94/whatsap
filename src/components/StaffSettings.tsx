@@ -49,7 +49,7 @@ export const StaffSettings: React.FC<StaffSettingsProps> = ({ onBack }) => {
   const [formData, setFormData] = useState<Partial<StaffProfile>>({});
 
   useEffect(() => {
-    const q = query(collection(db, 'staff'));
+    const q = query(collection(db, 'profiles'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as StaffProfile[];
       setStaffList(data);
@@ -88,7 +88,7 @@ export const StaffSettings: React.FC<StaffSettingsProps> = ({ onBack }) => {
     }
     setIsSaving(true);
     try {
-      await setDoc(doc(db, 'staff', activeStaffId), {
+      await setDoc(doc(db, 'profiles', activeStaffId), {
         ...formData,
         updatedAt: serverTimestamp()
       }, { merge: true });
@@ -103,7 +103,7 @@ export const StaffSettings: React.FC<StaffSettingsProps> = ({ onBack }) => {
   const handleDelete = async (id: string) => {
     if (!confirm("האם אתה בטוח שברצונך למחוק פרופיל זה?")) return;
     try {
-      await deleteDoc(doc(db, 'staff', id));
+      await deleteDoc(doc(db, 'profiles', id));
       if (activeStaffId === id) {
         setActiveStaffId(null);
         setFormData({});
