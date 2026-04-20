@@ -26,7 +26,7 @@ import {
   LayoutGrid,
   Eye,
   Maximize2,
-  History, Warehouse,
+  History, Warehouse, Users,
   Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -56,6 +56,7 @@ import { OrderHistory } from './components/OrderHistory';
 import { DeepDiveCard } from './components/DeepDiveCard';
 import { NoaChat } from './components/NoaChat';
 import { WarehouseDashboard } from './components/WarehouseDashboard';
+import { StaffSettings } from './components/StaffSettings';
 
 // --- Components ---
 
@@ -342,7 +343,7 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNoaTyping, setIsNoaTyping] = useState(false);
-  const [activeView, setActiveView] = useState<'sidebar' | 'chat' | 'history' | 'warehouse'>('sidebar');
+  const [activeView, setActiveView] = useState<'sidebar' | 'chat' | 'history' | 'warehouse' | 'staff'>('sidebar');
   const [historyOrderId, setHistoryOrderId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -362,7 +363,7 @@ export default function App() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleActiveViewChange = (view: 'sidebar' | 'chat' | 'history' | 'warehouse') => {
+  const handleActiveViewChange = (view: 'sidebar' | 'chat' | 'history' | 'warehouse' | 'staff') => {
     if (isTransitioning) return;
     setIsTransitioning(true);
     setActiveView(view as any);
@@ -859,6 +860,32 @@ export default function App() {
                 )} />
               </div>
 
+              <div 
+                onClick={() => handleActiveViewChange('staff')}
+                className={cn(
+                  "flex items-center px-4 py-3 gap-3 cursor-pointer hover:bg-[#f0f2f5] transition-all border-b border-gray-100 group active:bg-gray-200",
+                  activeView === 'staff' && "bg-[#f0f2f5] border-r-4 border-r-[#00a884] shadow-inner"
+                )}
+              >
+                <div className={cn(
+                  "w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors shadow-sm",
+                  activeView === 'staff' ? "bg-[#111b21] text-white" : "bg-white text-[#54656f] group-hover:bg-[#111b21] group-hover:text-white border border-gray-100"
+                )}>
+                  <Users className="w-6 h-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className={cn(
+                    "text-sm font-semibold truncate",
+                    activeView === 'staff' ? "text-[#111b21]" : "text-[#111b21]"
+                  )}>הגדרות צוות</h3>
+                  <p className="text-[11px] text-gray-400 truncate">ניהול פרופילים וקופסה שחורה</p>
+                </div>
+                <ChevronLeft className={cn(
+                  "w-4 h-4 transition-all opacity-0 group-hover:opacity-100",
+                  activeView === 'staff' ? "text-[#111b21] opacity-100" : "text-gray-300"
+                )} />
+              </div>
+
               <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 italic text-[10px] text-gray-400 font-bold tracking-widest uppercase shrink-0">
                  צוותים פעילים
               </div>
@@ -934,6 +961,8 @@ export default function App() {
               />
             ) : activeView === 'warehouse' ? (
               <WarehouseDashboard onBack={() => handleActiveViewChange(isMobile ? 'sidebar' : 'chat')} />
+            ) : activeView === 'staff' ? (
+              <StaffSettings onBack={() => handleActiveViewChange(isMobile ? 'sidebar' : 'chat')} />
             ) : (
               <>
                 <Header 

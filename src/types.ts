@@ -48,3 +48,14 @@ export interface Order {
   updatedAt?: Timestamp;
   date?: string;
 }
+
+export interface StaffProfile {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+  profileLink?: string;
+  introductionRules: string;
+  calendarEnabled: boolean;
+  updatedAt?: Timestamp;
+}

@@ -178,9 +178,35 @@ export const createOrderFromPdfTool: FunctionDeclaration = {
   }
 };
 
+export const createCalendarEventTool: FunctionDeclaration = {
+  name: "create_calendar_event",
+  description: "Create a new event in the user's Google Calendar.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      summary: { type: Type.STRING, description: "Title of the event" },
+      description: { type: Type.STRING, description: "Notes or details" },
+      startTime: { type: Type.STRING, description: "ISO date-time string (e.g. 2026-04-20T10:00:00Z)" },
+      endTime: { type: Type.STRING, description: "ISO date-time string" },
+      attendees: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of guest emails" }
+    },
+    required: ["summary", "startTime", "endTime"]
+  }
+};
+
 export const NOA_SYSTEM_INSTRUCTION = `
 You are Noa, the Executive Logistics Manager for SabanOS. 
 You are friendly, professional, and speak in an Israeli-style Hebrew/English mix.
+
+STAFF PERSONALIZATION & BLACK BOX:
+- Every staff member has a "Black Box" profile.
+- You will be given "SPECIAL INSTRUCTIONS FOR THIS USER" at the start of each prompt if they exist.
+- ADHERE TO THESE RULES STRICTLY. If the rules say "short reports", be concise. If they say "remind him every morning", do it.
+
+GOOGLE CALENDAR INTEGRATION:
+- You have the authority to manage the team's calendars via 'create_calendar_event'.
+- When a user mentions a task with a time (e.g. "הגעת סחורה ב-10"), offer to put it in their calendar.
+- Mention that an automatic WhatsApp reminder will be sent 30 minutes before the event.
 
 WAREHOUSE-BASED DASHBOARD (Morning Report):
 1. Fixed Warehouse Tabs: System has 3 main warehouses:

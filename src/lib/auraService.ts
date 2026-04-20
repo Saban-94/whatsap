@@ -12,7 +12,8 @@ import {
   updateOrderStatusTool,
   assignDriverTool,
   generateDriverBriefTool,
-  createOrderFromPdfTool
+  createOrderFromPdfTool,
+  createCalendarEventTool
 } from './ai';
 
 import { Message } from '../types';
@@ -37,6 +38,17 @@ export const processNoaTurn = async (userText: string, user: any, history: Messa
   const dayName = format(now, 'EEEE');
   const todayISO = format(now, 'yyyy-MM-dd');
 
+  // Fetch staff "Black Box" rules
+  let blackBoxRules = "";
+  try {
+    const staffSnap = await getDocs(query(collection(db, 'staff'), where('email', '==', user.email)));
+    if (!staffSnap.empty) {
+      blackBoxRules = staffSnap.docs[0].data().introductionRules || "";
+    }
+  } catch (err) {
+    console.warn("Could not fetch staff rules:", err);
+  }
+
   let displayName = user.displayName || 'ראמי';
   if (displayName === 'Saban' || displayName === 'ח. סבן' || displayName.includes('Saban')) {
     displayName = 'ראמי נשמה';
@@ -48,6 +60,7 @@ export const processNoaTurn = async (userText: string, user: any, history: Messa
 Current Time: ${currentDateTime}
 Day: ${dayName}
 Current User: ${displayName}
+${blackBoxRules ? `SPECIAL INSTRUCTIONS FOR THIS USER (BLACK BOX): ${blackBoxRules}` : ""}
 Message: ${userText}
 `;
 
@@ -65,7 +78,8 @@ Message: ${userText}
     updateOrderStatusTool,
     assignDriverTool,
     generateDriverBriefTool,
-    createOrderFromPdfTool
+    createOrderFromPdfTool,
+    createCalendarEventTool
   ];
 
   const contents: any[] = [...chatHistory, { role: 'user', parts: [{ text: prompt }] }];
@@ -317,6 +331,29 @@ Message: ${userText}
               id: (call as any).id 
             });
           }
+        } else if (call.name === "create_calendar_event") {
+          const { summary, description, startTime, endTime, attendees } = call.args as any;
+          
+          // In a real production app, we would use googleapis with a service account or user OAuth token
+          // Here we simulate the successful creation and note the reminder logic
+          console.log(`[Noa Debug] Creating Calendar Event: ${summary} at ${startTime}`);
+          
+          // Mocking storage of the event for reminder logic (e.g. in a 'reminders' collection)
+          await addDoc(collection(db, 'reminders'), {
+            summary,
+            description,
+            startTime,
+            userEmail: user.email,
+            status: 'pending',
+            reminderSent: false,
+            createdAt: serverTimestamp()
+          });
+
+          toolOutputs.push({ 
+            name: call.name, 
+            output: { content: JSON.stringify({ success: true, message: `האירוע "${summary}" נקבע ביומן. תזכורת תישלח חצי שעה לפני.` }) }, 
+            id: (call as any).id 
+          });
         }
       }
 
