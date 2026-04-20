@@ -876,7 +876,15 @@ export default function App() {
           contents: [
             { role: 'user', parts: [{ text: prompt }] },
             { role: 'model', parts: response.functionCalls.map(c => ({ functionCall: c })) },
-            { role: 'user', parts: toolOutputs.map(o => ({ functionResponse: { name: response.functionCalls![toolOutputs.indexOf(o)].name, response: o.output, id: o.callId } })) }
+            { 
+              role: 'user', 
+              parts: toolOutputs.map((o, idx) => ({ 
+                functionResponse: { 
+                  name: response.functionCalls![idx].name, 
+                  response: { content: o.output }
+                } 
+              })) 
+            }
           ],
           config: { systemInstruction: NOA_SYSTEM_INSTRUCTION }
         });
