@@ -14,6 +14,18 @@ import {
   generateDriverBriefTool
 } from './ai';
 
+const getDriverName = (driverId?: string) => {
+  if (!driverId) return 'טרם שובץ';
+  const mapping: Record<string, string> = {
+    'ali': 'עלי',
+    'hikmat': 'חיכמת',
+    'hikmet': 'חיכמת',
+    'sami': 'סאמי',
+    'ahmed': 'אחמד'
+  };
+  return mapping[driverId.toLowerCase()] || driverId;
+};
+
 export const processNoaTurn = async (userText: string, user: any) => {
   if (!ai || !user) return null;
 
@@ -95,7 +107,8 @@ Message: ${userText}
               status: data.status || 'pending',
               items: rawItems,
               date: data.date,
-              driverId: data.driverId
+              driverId: data.driverId,
+              driverName: getDriverName(data.driverId)
             };
           });
           
@@ -160,7 +173,8 @@ Message: ${userText}
               orderId: orderData.id,
               destination: orderData.destination,
               status: orderData.status,
-              driverId: orderData.driverId
+              driverId: orderData.driverId,
+              driverName: getDriverName(orderData.driverId)
             };
             
             console.log(`[Noa Debug] get_order_details found:`, flatResult.customer);
@@ -200,15 +214,33 @@ Message: ${userText}
 
         } else if (call.name === "create_order") {
           const { customer, items } = call.args as any;
+          
+          // Ensure items is a string for the database
+          const itemsStr = Array.isArray(items) ? items.join(', ') : (items || "לא הוזנו פריטים");
+
           const docRef = await addDoc(collection(db, 'orders'), {
             customerName: customer,
-            items: items || ["פריטים מהצ'אט"],
+            items: itemsStr,
             status: 'pending',
             createdBy: 'noa',
             createdAt: serverTimestamp(),
             date: todayISO
           });
-          toolOutputs.push({ name: call.name, output: { content: JSON.stringify({ success: true, orderId: docRef.id }) }, id: (call as any).id });
+
+          const confirmation = { 
+            success: true, 
+            orderId: docRef.id, 
+            customer: customer,
+            items: itemsStr,
+            message: `הזמנה עבור ${customer} נוצרה בהצלחה במערכת.`
+          };
+
+          console.log(`[Noa Debug] create_order successful for: ${customer}`);
+          toolOutputs.push({ 
+            name: call.name, 
+            output: { content: JSON.stringify(confirmation) }, 
+            id: (call as any).id 
+          });
         } else if (call.name === "driver_report") {
           const { driverName, truckNumber, kilometers, notes } = call.args as any;
           const docRef = await addDoc(collection(db, 'driver_reports'), {

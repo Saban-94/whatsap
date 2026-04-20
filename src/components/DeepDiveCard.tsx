@@ -23,19 +23,45 @@ export const DeepDiveCard: React.FC<DeepDiveCardProps> = ({ order }) => {
     if (Array.isArray(itemsInput)) return itemsInput;
     if (!itemsInput || typeof itemsInput !== 'string') return [];
     
-    // User requested Regex Parsing: split when a new item pattern (number + text) is found
-    // We match a number followed by everything UNTIL we see another number that starts a new entry (number + space)
-    const regex = /(\d+\s+.*?(?=(?:\s+\d+\s+)|$))/g;
-    const matches = itemsInput.match(regex);
+    // First, check for obvious delimiters
+    if (itemsInput.includes(',') || itemsInput.includes('\n') || itemsInput.includes(';')) {
+      return itemsInput.split(/[,\n;]/).map(s => s.trim()).filter(Boolean);
+    }
+
+    // Advanced Logistics Parsing: Handles mixed delimiters and dimensions (e.g., "500 3 מטר")
+    // Dimensional/Unit list to ignore as "New Item" starters
+    const units = ['מטר', 'מ', 'סמ', 'ממ', 'צול', "מ'", 'מ"', 'ס"מ', 'מ"מ', 'ק"ג', 'קג', 'יח', 'יחידה', 'יחידות', 'חבילה', 'שק'];
     
-    // Re-combining algorithm: if a part is just a number (like 500 or 3), it might have been greedy.
-    // For "10 צינור קרטון 500 3 מטר", we want to keep them together if they are part of dimensions.
-    // A heuristic: if the quantity is very large or followed by units, it's likely part of the name.
-    
-    if (!matches || matches.length === 0) return [itemsInput];
-    
-    // Clean and return
-    return matches.map(m => m.trim());
+    // Normalize and split by space
+    const words = itemsInput.replace(/\s+/g, ' ').trim().split(' ');
+    const result: string[] = [];
+    let currentItem = '';
+
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      const nextWord = words[i + 1];
+
+      // Is this word a candidate for a new item quantity? (e.g., "10", "10x", "5*")
+      const isQuantity = /^\d+([xX*])?$/.test(word);
+      
+      // A quantity is a "New Item Starter" ONLY IF:
+      // 1. It's not the first word AND...
+      // 2. The next word is NOT a unit (like "מטר") AND...
+      // 3. The next word is NOT another number (like dimensions "500 3")
+      const looksLikeNewItem = isQuantity && nextWord && 
+                               !/^\d/.test(nextWord) && 
+                               !units.some(u => nextWord.startsWith(u));
+
+      if (looksLikeNewItem && currentItem !== '') {
+        result.push(currentItem.trim());
+        currentItem = word;
+      } else {
+        currentItem += (currentItem === '' ? '' : ' ') + word;
+      }
+    }
+
+    if (currentItem) result.push(currentItem.trim());
+    return result.length > 0 ? result : [itemsInput];
   };
 
   const itemsList = parseItems(order.items || '');
