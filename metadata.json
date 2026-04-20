@@ -1,6 +1,6 @@
 {
   "name": "SabanMessenger",
   "description": "A luxury WhatsApp Web clone for Saban logistics, powered by Noa AI.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": []
 }

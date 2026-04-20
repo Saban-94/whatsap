@@ -22,8 +22,9 @@ export interface Message {
   senderId: string;
   senderName: string;
   status: 'sent' | 'read';
-  type: 'text' | 'file';
+  type: 'text' | 'file' | 'audio';
   fileUrl?: string;
   fileName?: string;
+  duration?: number;
   createdAt: Timestamp;
 }

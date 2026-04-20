@@ -16,7 +16,10 @@ import {
   Menu,
   X,
   LogOut,
-  User
+  User,
+  Play,
+  Pause,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -45,6 +48,53 @@ interface MessageBubbleProps {
   message: Message;
   isMe: boolean;
 }
+
+const AudioPlayer = ({ url, duration }: { url?: string, duration?: number }) => {
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const togglePlay = () => {
+    if (playing) {
+      audioRef.current?.pause();
+    } else {
+      audioRef.current?.play();
+    }
+    setPlaying(!playing);
+  };
+
+  const formatTime = (time: number) => {
+    const min = Math.floor(time / 60);
+    const sec = Math.floor(time % 60);
+    return `${min}:${sec.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="flex items-center gap-3 py-2 px-1 min-w-[200px]">
+      <audio 
+        ref={audioRef} 
+        src={url} 
+        onEnded={() => setPlaying(false)} 
+        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+      />
+      <button onClick={togglePlay} className="text-[#54656f] hover:text-[#00a884] transition-colors">
+        {playing ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current" />}
+      </button>
+      <div className="flex-1 h-1 bg-gray-200 rounded-full relative">
+        <div 
+          className="absolute inset-y-0 left-0 bg-[#00a884] rounded-full" 
+          style={{ width: `${(currentTime / (duration || audioRef.current?.duration || 1)) * 100}%` }}
+        />
+      </div>
+      <span className="text-[11px] text-gray-500 font-mono">
+        {formatTime(currentTime || duration || 0)}
+      </span>
+      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+        <Mic className="w-5 h-5 text-gray-400" />
+      </div>
+    </div>
+  );
+};
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe }) => {
   return (
@@ -81,6 +131,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe }) => {
             </div>
             <Download className="w-6 h-6 text-[#8696a0]" />
           </a>
+        ) : message.type === 'audio' ? (
+          <AudioPlayer url={message.fileUrl} duration={message.duration} />
         ) : (
           <p className="text-[14.2px] text-[#111b21] whitespace-pre-wrap leading-normal">{message.text}</p>
         )}
@@ -150,12 +202,66 @@ const Header: React.FC<HeaderProps> = ({ user, toggleSidebar, isSidebarOpen }) =
 interface InputAreaProps {
   onSendMessage: (msg: string) => void;
   onSendFile: (file: File) => void;
+  onSendAudio: (blob: Blob, duration: number) => void;
   isTyping: boolean;
 }
 
-const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onSendFile, isTyping }) => {
+const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onSendFile, onSendAudio, isTyping }) => {
   const [text, setText] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (recordingDuration > 1) {
+          onSendAudio(audioBlob, recordingDuration);
+        }
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      timerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Error accessing microphone", err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.onstop = null; // Prevent sending
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+  };
 
   const handleSend = () => {
     if (!text.trim()) return;
@@ -171,6 +277,12 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onSendFile, isTypi
     }
   };
 
+  const formatDuration = (sec: number) => {
+    const min = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${min}:${s.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div className="bg-[#f0f2f5] min-h-[62px] py-2 px-3 flex items-center gap-3 sticky bottom-0 z-10 border-t border-gray-300">
       <input 
@@ -179,34 +291,62 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onSendFile, isTypi
         className="hidden" 
         onChange={handleFileChange}
       />
-      <div className="flex gap-3 text-[#54656f]">
-        <Smile className="w-6 h-6 cursor-pointer" />
-        <Paperclip 
-          className="w-6 h-6 cursor-pointer" 
-          onClick={() => fileInputRef.current?.click()}
-        />
-      </div>
-      <div className="flex-1 relative">
-        <input 
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="הקלד הודעה"
-          className="w-full bg-white rounded-lg px-4 py-2 text-sm focus:outline-none placeholder:text-gray-500 shadow-sm"
-        />
-        {isTyping && (
-          <div className="absolute -top-6 right-2 text-[10px] italic text-[#00a884] font-medium bg-[#f0f2f5] px-2 rounded-full animate-pulse">
-            נועה מקלידה...
+      {!isRecording ? (
+        <>
+          <div className="flex gap-3 text-[#54656f]">
+            <Smile className="w-6 h-6 cursor-pointer" />
+            <Paperclip 
+              className="w-6 h-6 cursor-pointer" 
+              onClick={() => fileInputRef.current?.click()}
+            />
           </div>
-        )}
-      </div>
-      {text.trim() ? (
-        <Send 
-          onClick={handleSend}
-          className="w-6 h-6 text-[#00a884] cursor-pointer" 
-        />
+          <div className="flex-1 relative">
+            <input 
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="הקלד הודעה"
+              className="w-full bg-white rounded-lg px-4 py-2 text-sm focus:outline-none placeholder:text-gray-500 shadow-sm"
+            />
+            {isTyping && (
+              <div className="absolute -top-6 right-2 text-[10px] italic text-[#00a884] font-medium bg-[#f0f2f5] px-2 rounded-full animate-pulse">
+                נועה מקלידה...
+              </div>
+            )}
+          </div>
+          {text.trim() ? (
+            <Send 
+              onClick={handleSend}
+              className="w-6 h-6 text-[#00a884] cursor-pointer" 
+            />
+          ) : (
+            <Mic 
+              onClick={startRecording}
+              className="w-6 h-6 text-[#54656f] cursor-pointer hover:text-[#00a884] transition-colors" 
+            />
+          )}
+        </>
       ) : (
-        <Mic className="w-6 h-6 text-[#54656f] cursor-pointer" />
+        <div className="flex-1 flex items-center justify-between bg-white rounded-lg px-4 py-2 border border-red-100 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-sm font-mono text-gray-700">{formatDuration(recordingDuration)}</span>
+          </div>
+          <p className="text-xs text-gray-400">הקלטה פעילה...</p>
+          <div className="flex items-center gap-4">
+            <Trash2 
+              onClick={cancelRecording}
+              className="w-5 h-5 text-gray-400 cursor-pointer hover:text-red-500 transition-colors" 
+            />
+            <div className="w-[1px] h-4 bg-gray-200" />
+            <div 
+              onClick={stopRecording}
+              className="w-8 h-8 bg-[#00a884] rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-[#008f72] transition-colors"
+            >
+              <Send className="w-4 h-4 text-white" />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -301,9 +441,30 @@ export default function App() {
     };
 
     await addDoc(collection(db, 'chats', chatId, 'messages'), msgData);
-    
-    // Trigger AI Analysis instead of generic response
     handleAIAnalysis(file);
+  };
+
+  const handleSendAudio = async (blob: Blob, duration: number) => {
+    if (!user) return;
+    const chatId = `chat_${user.uid}_noa`;
+    
+    playTick();
+
+    const fileUrl = URL.createObjectURL(blob);
+    
+    const msgData = {
+      text: `שלחתי הודעה קולית (${duration} שניות)`,
+      senderId: user.uid,
+      senderName: user.displayName || 'User',
+      status: 'sent',
+      type: 'audio' as const,
+      fileUrl: fileUrl,
+      duration: duration,
+      createdAt: serverTimestamp()
+    };
+
+    await addDoc(collection(db, 'chats', chatId, 'messages'), msgData);
+    handleAIResponse(`קיבלתי את ההודעה הקולית שלך. מה תרצה שאעשה איתה?`);
   };
 
   const handleAIAnalysis = async (file: File) => {
@@ -530,7 +691,12 @@ export default function App() {
           <div ref={messagesEndRef} />
         </div>
 
-        <InputArea onSendMessage={handleSendMessage} onSendFile={handleSendFile} isTyping={isNoaTyping} />
+        <InputArea 
+          onSendMessage={handleSendMessage} 
+          onSendFile={handleSendFile} 
+          onSendAudio={handleSendAudio}
+          isTyping={isNoaTyping} 
+        />
       </div>
 
       <style>{`
