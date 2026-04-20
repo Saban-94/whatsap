@@ -870,18 +870,19 @@ export default function App() {
           }
         }
 
-        // Send results back to model
+        // Send results back to model with full previous context to preserve thought_signature
         response = await ai.models.generateContent({
           model: "gemini-3-flash-preview",
           contents: [
             { role: 'user', parts: [{ text: prompt }] },
-            { role: 'model', parts: response.functionCalls.map(c => ({ functionCall: c })) },
+            response.candidates[0].content, // Use the full original content (includes thought_signature + functionCalls)
             { 
               role: 'user', 
               parts: toolOutputs.map((o, idx) => ({ 
                 functionResponse: { 
                   name: response.functionCalls![idx].name, 
-                  response: { content: o.output }
+                  response: { content: o.output },
+                  id: (response.functionCalls![idx] as any).id
                 } 
               })) 
             }

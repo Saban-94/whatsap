@@ -1,9 +1,7 @@
-const CACHE_NAME = 'sabanos-v1';
+const CACHE_NAME = 'sabanos-v2';
 const urlsToCache = [
   '/',
-  '/index.html',
-  '/src/main.tsx',
-  '/src/App.tsx'
+  '/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
