@@ -580,6 +580,26 @@ export default function App() {
     });
   };
 
+  const markMessagesAsRead = async () => {
+    if (!user) return;
+    const chatId = `chat_${user.uid}_noa`;
+    const userMsgsQuery = query(
+      collection(db, 'chats', chatId, 'messages'),
+      where('senderId', '==', user.uid),
+      where('status', '==', 'sent')
+    );
+    
+    try {
+      const snapshot = await getDocs(userMsgsQuery);
+      const updates = snapshot.docs.map(d => 
+        updateDoc(doc(db, 'chats', chatId, 'messages', d.id), { status: 'read' })
+      );
+      await Promise.all(updates);
+    } catch (err) {
+      console.error("Error marking messages as read:", err);
+    }
+  };
+
   const handleAIAnalysis = async (file: File) => {
     if (!ai || !user) return;
     setIsNoaTyping(true);
@@ -598,6 +618,9 @@ export default function App() {
 
       const reply = await processNoaTurn(analysisPrompt, user, messages, filePart) || "קלטתי את הקובץ, אבל אני צריכה עוד רגע לעבד אותו. מה התוכנית?";
       
+      // Mark as read after Processing is complete
+      await markMessagesAsRead();
+
       setTimeout(async () => {
         await addDoc(collection(db, 'chats', chatId, 'messages'), {
           text: reply,
@@ -623,20 +646,10 @@ export default function App() {
     const chatId = `chat_${user.uid}_noa`;
 
     try {
-      // Mark user messages as read
-      const userMsgsQuery = query(
-        collection(db, 'chats', chatId, 'messages'),
-        where('senderId', '==', user.uid),
-        where('status', '==', 'sent')
-      );
-      
-      getDocs(userMsgsQuery).then(snapshot => {
-        snapshot.forEach(d => {
-          updateDoc(doc(db, 'chats', chatId, 'messages', d.id), { status: 'read' });
-        });
-      });
-
       const reply = await processNoaTurn(userText, user, messages) || "סליחה, אירעה שגיאה בעיבוד הבקשה.";
+      
+      // Mark user messages as read once Noa finishes processing
+      await markMessagesAsRead();
       
       // Simulate delay for natural feel
       setTimeout(async () => {
