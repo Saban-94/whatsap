@@ -345,6 +345,20 @@ export default function App() {
   const [historyOrderId, setHistoryOrderId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isFocused, setIsFocused] = useState(true);
+
+  // Focus tracking
+  useEffect(() => {
+    const onFocus = () => setIsFocused(true);
+    const onBlur = () => setIsFocused(false);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, []);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const handleActiveViewChange = (view: 'sidebar' | 'chat' | 'history') => {
@@ -455,14 +469,41 @@ export default function App() {
       limit(50)
     );
 
-    return onSnapshot(q, (snapshot) => {
+    const msgsUnsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const msg = change.doc.data() as any;
+          const msgTime = msg.createdAt?.toMillis() || Date.now();
+          const now = Date.now();
+          
+          // Only notify if:
+          // 1. It's from others (Noa)
+          // 2. The message is fresh (within last 15 seconds)
+          // 3. The window is not focused OR the chat is not the active view
+          if (msg.senderId !== user.uid && (now - msgTime < 15000)) {
+            if (!isFocused || (isMobile && activeView !== 'chat')) {
+              if ("Notification" in window && Notification.permission === "granted") {
+                new Notification(msg.senderName || "Saban Messenger", {
+                  body: msg.text,
+                  icon: "https://picsum.photos/seed/sabanos/192/192",
+                  tag: 'saban-msg-' + msg.senderId
+                });
+              }
+              playAICompletion(); // Play sound if not in focus
+            }
+          }
+        }
+      });
+
       const msgs: Message[] = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as Message));
       setMessages(msgs);
     });
-  }, [user]);
+
+    return () => msgsUnsubscribe();
+  }, [user, isFocused, isMobile, activeView]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
