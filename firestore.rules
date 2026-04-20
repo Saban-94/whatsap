@@ -65,9 +65,10 @@ service cloud.firestore {
                     request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
                     isValidMessage(request.resource.data);
       allow update: if isSignedIn() && 
-                    request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
-                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
-                    request.resource.data.status == 'read';
+                    request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants && (
+                    (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status == 'read') ||
+                    (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']))
+                    );
     }
   }
 }

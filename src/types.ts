@@ -26,5 +26,6 @@ export interface Message {
   fileUrl?: string;
   fileName?: string;
   duration?: number;
+  reactions?: Record<string, string[]>; // emoji -> list of userIds
   createdAt: Timestamp;
 }

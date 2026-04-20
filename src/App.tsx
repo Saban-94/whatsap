@@ -96,58 +96,121 @@ const AudioPlayer = ({ url, duration }: { url?: string, duration?: number }) => 
   );
 };
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe }) => {
+interface MessageBubbleProps {
+  message: Message;
+  isMe: boolean;
+  onReact: (messageId: string, emoji: string) => void;
+}
+
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, onReact }) => {
+  const [showReactions, setShowReactions] = useState(false);
+  const emojis = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       className={cn(
-        "flex w-full mb-2",
+        "flex w-full mb-4 group",
         isMe ? "justify-end" : "justify-start"
       )}
+      onMouseLeave={() => setShowReactions(false)}
     >
-      <div
-        className={cn(
-          "max-w-[65%] px-2 py-1.5 rounded-lg shadow-sm relative",
-          isMe ? "bg-[#d9fdd3] rounded-tr-none" : "bg-white rounded-tl-none"
-        )}
-      >
-        {message.type === 'file' ? (
-          <a 
-            href={message.fileUrl} 
-            download={message.fileName} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 p-3 bg-black/5 rounded-md mb-1 border border-gray-100 hover:bg-black/10 transition-colors cursor-pointer"
-          >
-            <div className="bg-[#00a884] p-3 rounded text-white">
-              <FileText className="w-6 h-6" />
-            </div>
-            <div className="flex-1 min-w-0 mx-3">
-              <p className="text-sm font-medium truncate">{message.fileName || 'קובץ'}</p>
-              <p className="text-[10px] text-gray-500 uppercase">
-                {message.fileName?.split('.').pop()?.toUpperCase() || 'FILE'}
-              </p>
-            </div>
-            <Download className="w-6 h-6 text-[#8696a0]" />
-          </a>
-        ) : message.type === 'audio' ? (
-          <AudioPlayer url={message.fileUrl} duration={message.duration} />
-        ) : (
-          <p className="text-[14.2px] text-[#111b21] whitespace-pre-wrap leading-normal">{message.text}</p>
-        )}
-        
-        <div className="flex items-center justify-end gap-1 mt-1">
-          <span className="text-[11px] text-gray-500">
-            {message.createdAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || '...'}
-          </span>
-          {isMe && (
-            message.status === 'read' ? (
-              <CheckCheck className="w-[16px] h-[16px] text-[#53bdeb]" />
-            ) : (
-              <CheckCheck className="w-[16px] h-[16px] text-[#8696a0]" />
-            )
+      <div className={cn("relative flex items-end gap-1", isMe ? "flex-row-reverse" : "flex-row")}>
+        <div
+          className={cn(
+            "max-w-[85%] px-2 py-1.5 rounded-lg shadow-sm relative",
+            isMe ? "bg-[#d9fdd3] rounded-tr-none" : "bg-white rounded-tl-none"
           )}
+        >
+          {message.type === 'file' ? (
+            <a 
+              href={message.fileUrl} 
+              download={message.fileName} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 p-3 bg-black/5 rounded-md mb-1 border border-gray-100 hover:bg-black/10 transition-colors cursor-pointer"
+            >
+              <div className="bg-[#00a884] p-3 rounded text-white">
+                <FileText className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0 mx-3">
+                <p className="text-sm font-medium truncate">{message.fileName || 'קובץ'}</p>
+                <p className="text-[10px] text-gray-500 uppercase">
+                  {message.fileName?.split('.').pop()?.toUpperCase() || 'FILE'}
+                </p>
+              </div>
+              <Download className="w-6 h-6 text-[#8696a0]" />
+            </a>
+          ) : message.type === 'audio' ? (
+            <AudioPlayer url={message.fileUrl} duration={message.duration} />
+          ) : (
+            <p className="text-[14.2px] text-[#111b21] whitespace-pre-wrap leading-normal">{message.text}</p>
+          )}
+          
+          <div className="flex items-center justify-end gap-1 mt-1">
+            <span className="text-[11px] text-gray-500">
+              {message.createdAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || '...'}
+            </span>
+            {isMe && (
+              message.status === 'read' ? (
+                <CheckCheck className="w-[16px] h-[16px] text-[#53bdeb]" />
+              ) : (
+                <CheckCheck className="w-[16px] h-[16px] text-[#8696a0]" />
+              )
+            )}
+          </div>
+
+          {/* Reactions display */}
+          {message.reactions && Object.keys(message.reactions).length > 0 && (
+            <div className={cn(
+              "absolute -bottom-3 flex gap-1 bg-white rounded-full px-1.5 py-0.5 shadow-md border border-gray-100 z-[1]",
+              isMe ? "left-0" : "right-0"
+            )}>
+              {Object.entries(message.reactions).map(([emoji, users]) => (
+                <span key={emoji} className="text-[11px] flex items-center gap-0.5">
+                  {emoji} <span className="text-gray-500">{(users as string[]).length > 1 ? (users as string[]).length : ''}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Reaction picker trigger */}
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity relative">
+          <button 
+            onClick={() => setShowReactions(!showReactions)}
+            className="p-1 hover:bg-gray-200 rounded-full text-gray-500"
+          >
+            <Smile className="w-5 h-5" />
+          </button>
+          
+          <AnimatePresence>
+            {showReactions && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.8 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.8 }}
+                className={cn(
+                  "absolute bottom-full mb-2 bg-white rounded-full shadow-xl border border-gray-100 p-1 flex gap-2 z-50",
+                  isMe ? "right-0" : "left-0"
+                )}
+              >
+                {emojis.map(emoji => (
+                  <button 
+                    key={emoji}
+                    onClick={() => {
+                      onReact(message.id!, emoji);
+                      setShowReactions(false);
+                    }}
+                    className="hover:scale-125 transition-transform p-1 text-xl"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </motion.div>
@@ -467,6 +530,27 @@ export default function App() {
     handleAIResponse(`קיבלתי את ההודעה הקולית שלך. מה תרצה שאעשה איתה?`);
   };
 
+  const handleReact = async (messageId: string, emoji: string) => {
+    if (!user) return;
+    const chatId = `chat_${user.uid}_noa`;
+    const msgRef = doc(db, 'chats', chatId, 'messages', messageId);
+    
+    const message = messages.find(m => m.id === messageId);
+    if (!message) return;
+
+    const reactions = { ...(message.reactions || {}) };
+    const userIds = reactions[emoji] || [];
+
+    if (userIds.includes(user.uid)) {
+      reactions[emoji] = userIds.filter(id => id !== user.uid);
+      if (reactions[emoji].length === 0) delete reactions[emoji];
+    } else {
+      reactions[emoji] = [...userIds, user.uid];
+    }
+
+    await updateDoc(msgRef, { reactions });
+  };
+
   const handleAIAnalysis = async (file: File) => {
     if (!ai || !user) return;
     setIsNoaTyping(true);
@@ -677,7 +761,7 @@ export default function App() {
           </div>
 
           {messages.map((m) => (
-            <MessageBubble key={m.id} message={m} isMe={m.senderId === user.uid} />
+            <MessageBubble key={m.id} message={m} isMe={m.senderId === user.uid} onReact={handleReact} />
           ))}
           
           {isNoaTyping && (
