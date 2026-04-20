@@ -116,7 +116,7 @@ export const DeepDiveCard: React.FC<DeepDiveCardProps> = ({ order }) => {
               <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
                 <User className="w-3.5 h-3.5" />
               </div>
-              <span className="font-semibold text-gray-700">נהג: {order.driverId === 'ali' ? 'עלי' : order.driverId === 'hikmat' ? 'חיכמת' : order.driverId}</span>
+              <span className="font-semibold text-gray-700">נהג מעמיס: {order.driverId === 'ali' ? 'עלי' : order.driverId === 'hikmat' ? 'חיכמת' : (order.driverName || order.driverId)}</span>
             </div>
           </div>
         )}

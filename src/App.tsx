@@ -26,7 +26,7 @@ import {
   LayoutGrid,
   Eye,
   Maximize2,
-  History,
+  History, Warehouse,
   Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -55,6 +55,7 @@ import remarkGfm from 'remark-gfm';
 import { OrderHistory } from './components/OrderHistory';
 import { DeepDiveCard } from './components/DeepDiveCard';
 import { NoaChat } from './components/NoaChat';
+import { WarehouseDashboard } from './components/WarehouseDashboard';
 
 // --- Components ---
 
@@ -341,7 +342,7 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNoaTyping, setIsNoaTyping] = useState(false);
-  const [activeView, setActiveView] = useState<'sidebar' | 'chat' | 'history'>('sidebar');
+  const [activeView, setActiveView] = useState<'sidebar' | 'chat' | 'history' | 'warehouse'>('sidebar');
   const [historyOrderId, setHistoryOrderId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -361,10 +362,10 @@ export default function App() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleActiveViewChange = (view: 'sidebar' | 'chat' | 'history') => {
+  const handleActiveViewChange = (view: 'sidebar' | 'chat' | 'history' | 'warehouse') => {
     if (isTransitioning) return;
     setIsTransitioning(true);
-    setActiveView(view);
+    setActiveView(view as any);
     if (view !== 'history') setHistoryOrderId(null); // Reset when leaving history
     setTimeout(() => setIsTransitioning(false), 400); // Buffer for animation
   };
@@ -832,6 +833,32 @@ export default function App() {
                 )} />
               </div>
 
+              <div 
+                onClick={() => handleActiveViewChange('warehouse')}
+                className={cn(
+                  "flex items-center px-4 py-3 gap-3 cursor-pointer hover:bg-[#f0f2f5] transition-all border-b border-gray-100 group active:bg-gray-200",
+                  activeView === 'warehouse' && "bg-[#f0f2f5] border-r-4 border-[#00a884] shadow-inner"
+                )}
+              >
+                <div className={cn(
+                  "w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors shadow-sm",
+                  activeView === 'warehouse' ? "bg-[#00a884] text-white" : "bg-white text-[#00a884] group-hover:bg-[#00a884] group-hover:text-white border border-[#00a884]/20"
+                )}>
+                  <Warehouse className="w-6 h-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className={cn(
+                    "text-sm font-semibold truncate",
+                    activeView === 'warehouse' ? "text-[#00a884]" : "text-[#111b21]"
+                  )}>דשבורד מחסנים</h3>
+                  <p className="text-[11px] text-gray-400 truncate">ניהול העמסה לפי חלוקת מחסנים</p>
+                </div>
+                <ChevronLeft className={cn(
+                  "w-4 h-4 transition-all opacity-0 group-hover:opacity-100",
+                  activeView === 'warehouse' ? "text-[#00a884] opacity-100" : "text-gray-300"
+                )} />
+              </div>
+
               <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 italic text-[10px] text-gray-400 font-bold tracking-widest uppercase shrink-0">
                  צוותים פעילים
               </div>
@@ -891,7 +918,7 @@ export default function App() {
 
       {/* Main Area */}
       <AnimatePresence mode="wait">
-        {(!isMobile || activeView === 'chat' || activeView === 'history') && (
+        {(!isMobile || activeView === 'chat' || activeView === 'history' || activeView === 'warehouse') && (
           <motion.div 
             key={activeView}
             initial={isMobile ? { x: "-100%" } : { opacity: 0 }}
@@ -903,8 +930,10 @@ export default function App() {
             {activeView === 'history' ? (
               <OrderHistory 
                 onBack={() => handleActiveViewChange(isMobile ? 'sidebar' : 'chat')} 
-                selectedOrderId={historyOrderId || undefined}
+                selectedOrderId={historyOrderId || undefined} 
               />
+            ) : activeView === 'warehouse' ? (
+              <WarehouseDashboard onBack={() => handleActiveViewChange(isMobile ? 'sidebar' : 'chat')} />
             ) : (
               <>
                 <Header 
@@ -914,9 +943,7 @@ export default function App() {
                   isMobile={isMobile}
                   onBack={isMobile ? () => handleActiveViewChange('sidebar') : undefined}
                 />
-            
-                {/* Messages List (NoaChat) */}
-                <NoaChat 
+                <NoaChat
                   messages={messages} 
                   isNoaTyping={isNoaTyping} 
                   user={user} 

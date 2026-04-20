@@ -29,6 +29,7 @@ export interface Message {
   duration?: number;
   reactions?: Record<string, string[]>; // emoji -> list of userIds
   createdAt: Timestamp;
+  date?: string;
 }
 
 export interface Order {
@@ -45,4 +46,5 @@ export interface Order {
   createdBy?: string;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
+  date?: string;
 }
