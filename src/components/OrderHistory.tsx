@@ -26,14 +26,22 @@ import { he } from 'date-fns/locale';
 interface OrderHistoryProps {
   onOrderClick?: (orderId: string) => void;
   onBack?: () => void;
+  selectedOrderId?: string;
 }
 
-export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack }) => {
+export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack, selectedOrderId }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(selectedOrderId || '');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+
+  useEffect(() => {
+    if (selectedOrderId) {
+      setSearchTerm(selectedOrderId);
+      setStatusFilter('all');
+    }
+  }, [selectedOrderId]);
 
   useEffect(() => {
     fetchOrders();
@@ -65,8 +73,9 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack
   const filteredOrders = orders.filter(order => {
     const customer = (order.customerName || order.customer || '').toLowerCase();
     const destination = (order.destination || '').toLowerCase();
+    const orderId = (order.id || '').toLowerCase();
     const term = searchTerm.toLowerCase();
-    return customer.includes(term) || destination.includes(term);
+    return customer.includes(term) || destination.includes(term) || orderId.includes(term);
   });
 
   const getStatusBadge = (status?: string) => {
@@ -146,7 +155,10 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack
               <div 
                 key={order.id} 
                 onClick={() => onOrderClick?.(order.id!)}
-                className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-[#00a884]/30 transition-all cursor-pointer group active:scale-[0.98]"
+                className={cn(
+                  "bg-white border rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-[#00a884]/30 transition-all cursor-pointer group active:scale-[0.98]",
+                  selectedOrderId === order.id ? "border-[#00a884] ring-2 ring-[#00a884]/10 bg-[#00a884]/5" : "border-gray-200"
+                )}
               >
                 <div className="flex justify-between items-start mb-3">
                   <div>

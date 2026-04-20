@@ -342,6 +342,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNoaTyping, setIsNoaTyping] = useState(false);
   const [activeView, setActiveView] = useState<'sidebar' | 'chat' | 'history'>('sidebar');
+  const [historyOrderId, setHistoryOrderId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -350,7 +351,13 @@ export default function App() {
     if (isTransitioning) return;
     setIsTransitioning(true);
     setActiveView(view);
+    if (view !== 'history') setHistoryOrderId(null); // Reset when leaving history
     setTimeout(() => setIsTransitioning(false), 400); // Buffer for animation
+  };
+
+  const handleNavigateToOrderHistory = (orderId: string) => {
+    setHistoryOrderId(orderId);
+    handleActiveViewChange('history');
   };
 
   // Check for mobile
@@ -832,7 +839,10 @@ export default function App() {
             className="flex-1 flex flex-col h-full bg-[#efeae2] relative shadow-inner overflow-hidden"
           >
             {activeView === 'history' ? (
-              <OrderHistory onBack={() => handleActiveViewChange('sidebar')} />
+              <OrderHistory 
+                onBack={() => handleActiveViewChange(isMobile ? 'sidebar' : 'chat')} 
+                selectedOrderId={historyOrderId || undefined}
+              />
             ) : (
               <>
                 <Header 
@@ -849,7 +859,8 @@ export default function App() {
                   isNoaTyping={isNoaTyping} 
                   user={user} 
                   handleReact={handleReact} 
-                  messagesEndRef={messagesEndRef} 
+                  messagesEndRef={messagesEndRef}
+                  onNavigateToHistory={handleNavigateToOrderHistory}
                 />
 
                 <InputArea 

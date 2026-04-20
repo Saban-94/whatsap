@@ -77,8 +77,15 @@ Message: ${userText}
           const snap = await getDocs(q);
           let results = snap.docs.map(d => {
             const data = d.data() as any;
+            
+            // Robust mapping: try multiple variations just in case
+            const rawItemsData = data.items || data.Items || data.item_list || data.list;
+            
+            // Debug Log
+            console.log("Raw items from Firestore during search:", rawItemsData);
+            
             // Raw String Injection for items
-            const rawItems = Array.isArray(data.items) ? data.items.join(', ') : (data.items || '');
+            const rawItems = Array.isArray(rawItemsData) ? rawItemsData.join(', ') : (rawItemsData || "לא הוזנו פריטים");
             
             return {
               id: d.id,
@@ -137,8 +144,14 @@ Message: ${userText}
           }
 
           if (orderData) {
+            // Robust mapping: try multiple variations
+            const rawItemsData = orderData.items || orderData.Items || orderData.item_list || orderData.list;
+            
+            // Debug Log
+            console.log("Raw items from Firestore for details:", rawItemsData);
+            
             // Raw String Injection for items
-            const rawItems = Array.isArray(orderData.items) ? orderData.items.join(', ') : (orderData.items || '');
+            const rawItems = Array.isArray(rawItemsData) ? rawItemsData.join(', ') : (rawItemsData || "לא הוזנו פריטים");
             
             // Flat Tool Response as requested: { items, customer, orderId }
             const flatResult = {
@@ -170,7 +183,8 @@ Message: ${userText}
             }
             return false;
           }).map(order => {
-            const rawItems = Array.isArray(order.items) ? order.items.join(', ') : (order.items || '');
+            const rawItemsData = order.items || order.Items || order.item_list || order.list;
+            const rawItems = Array.isArray(rawItemsData) ? rawItemsData.join(', ') : (rawItemsData || "לא הוזנו פריטים");
             return {
               id: order.id,
               customer: order.customerName || order.customer || 'לקוח לא ידוע',

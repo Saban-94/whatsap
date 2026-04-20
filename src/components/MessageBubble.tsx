@@ -9,7 +9,8 @@ import {
   CheckCheck,
   Pause,
   Play,
-  Mic
+  Mic,
+  History
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -68,9 +69,10 @@ interface MessageBubbleProps {
   message: Message;
   isMe: boolean;
   onReact: (messageId: string, emoji: string) => void;
+  onNavigateToHistory?: (orderId: string) => void;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, onReact }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, onReact, onNavigateToHistory }) => {
   const [showReactions, setShowReactions] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const emojis = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
@@ -162,7 +164,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, onR
                 try {
                   const data = JSON.parse(message.text);
                   if (data && (data.customerName || data.customer) && (data.items || data.destination)) {
-                    return <DeepDiveCard order={data} />;
+                    return (
+                      <div className="flex flex-col gap-2">
+                        <DeepDiveCard order={data} />
+                        {onNavigateToHistory && (data.orderId || data.id) && (
+                          <button 
+                            onClick={() => onNavigateToHistory(data.orderId || data.id)}
+                            className="bg-[#efeae2] hover:bg-[#e6e2da] text-[#00a884] text-[11px] font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors border border-[#00a884]/10"
+                          >
+                            <History className="w-4 h-4" />
+                            צפה בהיסטוריית הזמנות מלאה
+                          </button>
+                        )}
+                      </div>
+                    );
                   }
                 } catch (e) {
                   // Not valid JSON

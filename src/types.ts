@@ -35,7 +35,7 @@ export interface Order {
   id?: string;
   customer: string;
   customerName?: string;
-  items: string[] | string;
+  items: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'preparing' | 'ready';
   destination?: string;
   warehouse?: string;

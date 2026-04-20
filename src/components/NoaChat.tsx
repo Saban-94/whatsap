@@ -9,6 +9,7 @@ interface NoaChatProps {
   user: any;
   handleReact: (messageId: string, emoji: string) => void;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
+  onNavigateToHistory?: (orderId: string) => void;
 }
 
 export const NoaChat: React.FC<NoaChatProps> = ({ 
@@ -16,7 +17,8 @@ export const NoaChat: React.FC<NoaChatProps> = ({
   isNoaTyping, 
   user, 
   handleReact, 
-  messagesEndRef 
+  messagesEndRef,
+  onNavigateToHistory
 }) => {
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6 md:px-10 space-y-2 custom-scrollbar pb-10">
@@ -33,7 +35,13 @@ export const NoaChat: React.FC<NoaChatProps> = ({
       </div>
 
       {messages.map((m) => (
-        <MessageBubble key={m.id} message={m} isMe={m.senderId === user.uid} onReact={handleReact} />
+        <MessageBubble 
+          key={m.id} 
+          message={m} 
+          isMe={m.senderId === user.uid} 
+          onReact={handleReact} 
+          onNavigateToHistory={onNavigateToHistory}
+        />
       ))}
       
       {isNoaTyping && (
