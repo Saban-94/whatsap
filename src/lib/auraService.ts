@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { collection, query, where, getDocs, limit, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, addDoc, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { 
   ai, 
@@ -8,7 +8,10 @@ import {
   getOrdersByDateTool, 
   createOrderTool,
   getOrderDetailsTool,
-  driverReportTool
+  driverReportTool,
+  updateOrderStatusTool,
+  assignDriverTool,
+  generateDriverBriefTool
 } from './ai';
 
 export const processNoaTurn = async (userText: string, user: any) => {
@@ -38,7 +41,10 @@ Message: ${userText}
     getOrdersByDateTool, 
     createOrderTool, 
     getOrderDetailsTool,
-    driverReportTool
+    driverReportTool,
+    updateOrderStatusTool,
+    assignDriverTool,
+    generateDriverBriefTool
   ];
 
   try {
@@ -180,6 +186,22 @@ Message: ${userText}
             createdAt: serverTimestamp()
           });
           toolOutputs.push({ name: call.name, output: { content: JSON.stringify({ success: true, reportId: docRef.id }) }, id: (call as any).id });
+        } else if (call.name === "update_order_status") {
+          const { orderId, status } = call.args as any;
+          await updateDoc(doc(db, 'orders', orderId), { status, updatedAt: serverTimestamp() });
+          toolOutputs.push({ name: call.name, output: { content: JSON.stringify({ success: true }) }, id: (call as any).id });
+        } else if (call.name === "assign_driver") {
+          const { orderId, driverId } = call.args as any;
+          await updateDoc(doc(db, 'orders', orderId), { driverId, updatedAt: serverTimestamp() });
+          toolOutputs.push({ name: call.name, output: { content: JSON.stringify({ success: true }) }, id: (call as any).id });
+        } else if (call.name === "generate_driver_brief") {
+          const { orderId } = call.args as any;
+          const orderDoc = await getDoc(doc(db, 'orders', orderId));
+          let result = null;
+          if (orderDoc.exists()) {
+            result = orderDoc.data();
+          }
+          toolOutputs.push({ name: call.name, output: { content: JSON.stringify(result) }, id: (call as any).id });
         }
       }
 

@@ -1,1 +1,35 @@
 @import "tailwindcss";
+
+@layer base {
+  .markdown-body {
+    @apply break-words;
+  }
+  
+  .markdown-body ul {
+    @apply list-disc list-inside;
+  }
+  
+  .markdown-body ol {
+    @apply list-decimal list-inside;
+  }
+  
+  .markdown-body p {
+    @apply mb-0;
+  }
+
+  .markdown-body .contains-task-list {
+    @apply list-none p-0;
+  }
+
+  .markdown-body .task-list-item {
+    @apply flex items-center gap-2 mb-1;
+  }
+
+  .markdown-body .task-list-item input[type="checkbox"] {
+    @apply w-4 h-4 rounded border-gray-300 text-[#00a884] focus:ring-[#00a884] cursor-pointer;
+  }
+  
+  .prose-compact p {
+    @apply my-0;
+  }
+}

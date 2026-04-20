@@ -48,6 +48,8 @@ import { cn } from './lib/utils';
 import { ChatMetadata, Message, UserProfile, Order } from './types';
 import { ai, NOA_SYSTEM_INSTRUCTION } from './lib/ai';
 import { processNoaTurn } from './lib/auraService';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // --- Components ---
 
@@ -191,7 +193,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, onReact })
           ) : message.type === 'audio' ? (
             <AudioPlayer url={message.fileUrl} duration={message.duration} />
           ) : (
-            <p className="text-[14.2px] text-[#111b21] whitespace-pre-wrap leading-normal">{message.text}</p>
+            <div className="text-[14.2px] text-[#111b21] leading-normal markdown-body prose-compact">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {message.text}
+              </ReactMarkdown>
+            </div>
           )}
           
           <div className="flex items-center justify-end gap-1 mt-1">
