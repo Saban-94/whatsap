@@ -19,7 +19,11 @@ import {
   User,
   Play,
   Pause,
-  Trash2
+  Trash2,
+  ArrowRight,
+  ChevronLeft,
+  Settings,
+  LayoutGrid
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -43,11 +47,6 @@ import { ChatMetadata, Message, UserProfile } from './types';
 import { ai, NOA_SYSTEM_INSTRUCTION } from './lib/ai';
 
 // --- Components ---
-
-interface MessageBubbleProps {
-  message: Message;
-  isMe: boolean;
-}
 
 const AudioPlayer = ({ url, duration }: { url?: string, duration?: number }) => {
   const [playing, setPlaying] = useState(false);
@@ -234,21 +233,31 @@ interface HeaderProps {
   user: any;
   toggleSidebar: () => void;
   isSidebarOpen: boolean;
+  onBack?: () => void;
+  isMobile: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, toggleSidebar, isSidebarOpen }) => (
-  <header className="h-[60px] bg-[#f0f2f5] flex items-center justify-between px-4 py-2 sticky top-0 z-10 shrink-0 border-r border-gray-200 shadow-sm">
+const Header: React.FC<HeaderProps> = ({ user, toggleSidebar, isSidebarOpen, onBack, isMobile }) => (
+  <header className="h-[60px] bg-[#f0f2f5] flex items-center justify-between px-4 py-2 sticky top-0 z-10 shrink-0 border-r border-gray-200 shadow-sm safe-top">
     <div className="flex items-center gap-4">
-      <button onClick={toggleSidebar} className="md:hidden p-1 hover:bg-gray-200 rounded-full transition-colors">
-        {isSidebarOpen ? <X className="text-[#54656f]" /> : <Menu className="text-[#54656f]" />}
-      </button>
+      {isMobile && onBack ? (
+        <button onClick={onBack} className="p-1 hover:bg-gray-200 rounded-full transition-colors mr-1">
+          <ArrowRight className="text-[#54656f] w-6 h-6" />
+        </button>
+      ) : (
+        <button onClick={toggleSidebar} className="md:hidden p-1 hover:bg-gray-200 rounded-full transition-colors">
+          {isSidebarOpen ? <X className="text-[#54656f]" /> : <Menu className="text-[#54656f]" />}
+        </button>
+      )}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center overflow-hidden">
-          <img src={user?.photoURL || 'https://picsum.photos/seed/user/100'} alt="Avatar" referrerPolicy="no-referrer" />
+        <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center overflow-hidden border border-gray-200">
+          <img src={isMobile && onBack ? 'https://picsum.photos/seed/noa-ai/100' : (user?.photoURL || 'https://picsum.photos/seed/user/100')} alt="Avatar" referrerPolicy="no-referrer" />
         </div>
         <div className="flex flex-col">
-          <h2 className="text-sm font-medium text-[#111b21] leading-tight">נועה AI (Saban Logistics)</h2>
-          <span className="text-xs text-gray-500">מחובר כעת</span>
+          <h2 className="text-sm font-semibold text-[#111b21] leading-tight">
+            {isMobile && onBack ? 'נועה AI (SabanOS)' : 'SabanOS'}
+          </h2>
+          <span className="text-[10px] text-green-600 font-medium tracking-wide">זמין כעת</span>
         </div>
       </div>
     </div>
@@ -420,7 +429,21 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNoaTyping, setIsNoaTyping] = useState(false);
+  const [activeView, setActiveView] = useState<'sidebar' | 'chat'>('sidebar');
+  const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Check for mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      const isMob = window.innerWidth < 768;
+      setIsMobile(isMob);
+      if (!isMob) setActiveView('chat'); // Always show chat on desktop
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // Sound effect
   const playTick = () => {
@@ -651,8 +674,8 @@ export default function App() {
           <div className="w-20 h-20 bg-[#00a884] rounded-full flex items-center justify-center mx-auto mb-6 text-white">
             <MessageSquare className="w-10 h-10" />
           </div>
-          <h1 className="text-2xl font-bold text-[#111b21] mb-2">ברוכים הבאים ל-SabanMessenger</h1>
-          <p className="text-gray-500 mb-8">התחברו כדי להתחיל לשוחח עם נועה AI ולנהל את הלוגיסטיקה שלכם</p>
+          <h1 className="text-2xl font-bold text-[#111b21] mb-2">SabanOS</h1>
+          <p className="text-gray-500 mb-8">מערכת ניהול לוגיסטיקה חכמה ומסונכרנת</p>
           <button 
             onClick={signIn}
             className="w-full bg-[#00a884] hover:bg-[#008f72] text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-3"
@@ -666,88 +689,129 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen bg-[#dadbd3] flex overflow-hidden font-sans" dir="rtl">
+    <div className="h-screen bg-[#dadbd3] flex overflow-hidden font-sans select-none touch-none" dir="rtl">
       {/* Sidebar - Contacts */}
-      <AnimatePresence>
-        {(isSidebarOpen || window.innerWidth > 768) && (
+      <AnimatePresence mode="wait">
+        {(!isMobile || activeView === 'sidebar') && (
           <motion.div 
-            initial={{ x: 300 }}
+            initial={isMobile ? { x: 300 } : false}
             animate={{ x: 0 }}
             exit={{ x: 300 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className={cn(
               "bg-white border-l border-gray-300 flex flex-col z-20 transition-all shadow-lg",
-              "fixed inset-y-0 right-0 w-[80%] md:relative md:w-[30%] lg:w-[25%] md:shadow-none"
+              isMobile ? "fixed inset-0 w-full" : "relative w-[30%] lg:w-[25%] md:shadow-none"
             )}
           >
-            <div className="h-[60px] bg-[#f0f2f5] flex items-center justify-between px-4 shrink-0 border-b border-gray-300">
-              <div className="w-10 h-10 rounded-full bg-gray-300 overflow-hidden">
+            <div className="h-[60px] bg-[#f0f2f5] flex items-center justify-between px-4 shrink-0 border-b border-gray-300 safe-top">
+              <div className="w-10 h-10 rounded-full bg-gray-300 overflow-hidden border border-gray-200">
                 <img src={user?.photoURL || ''} alt="Me" referrerPolicy="no-referrer" />
               </div>
               <div className="flex gap-5 text-[#54656f]">
-                <CircleDashed className="w-5 h-5 cursor-pointer" />
-                <MessageSquare className="w-5 h-5 cursor-pointer" />
-                <MoreVertical className="w-5 h-5 cursor-pointer" />
+                <CircleDashed className="w-5 h-5 cursor-pointer hover:text-[#00a884] transition-colors" />
+                <MessageSquare className="w-5 h-5 cursor-pointer hover:text-[#00a884] transition-colors" />
+                <MoreVertical className="w-5 h-5 cursor-pointer hover:text-[#00a884] transition-colors" />
               </div>
             </div>
 
-            <div className="p-2 bg-white">
-              <div className="bg-[#f0f2f5] rounded-lg flex items-center px-3 py-1.5 gap-4">
-                <Search className="w-5 h-5 text-gray-500 shrink-0" />
+            <div className="p-3 bg-white">
+              <div className="bg-[#f0f2f5] rounded-xl flex items-center px-3 py-2 gap-4">
+                <Search className="w-4 h-4 text-gray-500 shrink-0" />
                 <input 
-                  placeholder="חפש או התחל צ'אט חדש"
+                  placeholder="חיפוש מהיר או משימה חדשה..."
                   className="bg-transparent text-sm w-full focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
-              <div className="flex items-center px-4 py-3 gap-3 bg-[#f0f2f5] cursor-pointer hover:bg-gray-100 transition-colors border-b border-gray-100">
-                <div className="w-12 h-12 rounded-full bg-[#00a884] flex items-center justify-center text-white shrink-0 overflow-hidden">
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              <div 
+                onClick={() => isMobile && setActiveView('chat')}
+                className="flex items-center px-4 py-3 gap-3 bg-[#f0f2f5] cursor-pointer hover:bg-white transition-colors border-b border-gray-100"
+              >
+                <div className="w-12 h-12 rounded-full bg-[#00a884] flex items-center justify-center text-white shrink-0 overflow-hidden shadow-sm">
                   <img src="https://picsum.photos/seed/noa-ai/100" alt="Noa AI" referrerPolicy="no-referrer" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center mb-0.5">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-medium text-[#111b21] truncate">נועה AI</h3>
+                      <h3 className="text-sm font-semibold text-[#111b21] truncate">נועה AI (SabanOS)</h3>
                       <StatusIndicator status="online" />
                     </div>
-                    <span className="text-[10px] text-gray-500">עכשיו</span>
+                    <span className="text-[10px] text-[#00a884] font-medium">עכשיו</span>
                   </div>
-                  <p className="text-xs text-gray-500 truncate">
-                    {messages[messages.length - 1]?.text || 'התחילו לשוחח עם נועה...'}
+                  <p className="text-xs text-gray-500 truncate flex items-center gap-1">
+                    {isNoaTyping ? (
+                      <span className="text-[#00a884] italic animate-pulse">מקלידה...</span>
+                    ) : (
+                      messages[messages.length - 1]?.text || 'SabanOS מוכנה לפעולה'
+                    )}
                   </p>
                 </div>
+                {isMobile && <ChevronLeft className="w-4 h-4 text-gray-300" />}
               </div>
               
-              {/* Other demo contacts */}
-              {[1, 2, 3].map(i => (
-                <div key={i} className="flex items-center px-4 py-3 gap-3 cursor-pointer hover:bg-gray-50 transition-colors border-b border-white">
+              {/* Demo Contacts */}
+              {[1, 2].map(i => (
+                <div key={i} className="flex items-center px-4 py-3 gap-3 cursor-pointer hover:bg-gray-50 transition-colors border-b border-white opacity-80">
                   <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden shrink-0">
                     <img src={`https://picsum.photos/seed/user-${i}/100`} alt="demo" referrerPolicy="no-referrer" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center mb-0.5">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-medium text-[#111b21] truncate">איש קשר {i}</h3>
-                        <StatusIndicator status={i === 1 ? 'away' : i === 2 ? 'offline' : 'online'} />
+                        <h3 className="text-sm font-medium text-[#111b21] truncate">צוות שטח {i}</h3>
+                        <StatusIndicator status={i === 1 ? 'away' : 'offline'} />
                       </div>
-                      <span className="text-[10px] text-gray-500">12:45</span>
+                      <span className="text-[10px] text-gray-400">14:50</span>
                     </div>
-                    <p className="text-xs text-gray-500 truncate">הנחיות לוגיסטיות...</p>
+                    <p className="text-xs text-gray-400 truncate italic">משימה בטיפול...</p>
                   </div>
                 </div>
               ))}
             </div>
+
+            {/* Mobile Bottom Nav */}
+            {isMobile && (
+              <div className="h-[70px] bg-[#f0f2f5] border-t border-gray-200 flex items-center justify-around px-6 safe-bottom">
+                <div className="flex flex-col items-center gap-1 text-[#00a884]">
+                  <MessageSquare className="w-6 h-6" />
+                  <span className="text-[10px] font-bold">צ'אטים</span>
+                </div>
+                <div className="flex flex-col items-center gap-1 text-gray-400">
+                  <LayoutGrid className="w-6 h-6" />
+                  <span className="text-[10px]">משימות</span>
+                </div>
+                <div className="flex flex-col items-center gap-1 text-gray-400">
+                  <Settings className="w-6 h-6" />
+                  <span className="text-[10px]">הגדרות</span>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col h-full bg-[#efeae2] relative shadow-inner">
-        <Header user={user} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} isSidebarOpen={isSidebarOpen} />
+      <AnimatePresence mode="wait">
+        {(!isMobile || activeView === 'chat') && (
+          <motion.div 
+            initial={isMobile ? { x: -300 } : false}
+            animate={{ x: 0 }}
+            exit={{ x: -300 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="flex-1 flex flex-col h-full bg-[#efeae2] relative shadow-inner overflow-hidden"
+          >
+            <Header 
+              user={user} 
+              toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
+              isSidebarOpen={isSidebarOpen} 
+              isMobile={isMobile}
+              onBack={isMobile ? () => setActiveView('sidebar') : undefined}
+            />
         
         {/* Messages List */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 md:px-10 space-y-2 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto px-4 py-6 md:px-10 space-y-2 custom-scrollbar pb-10">
           <div className="flex justify-center mb-6">
             <span className="bg-[#e1f3fb] text-[#54656f] text-[11px] px-3 py-1 rounded-md uppercase font-medium">
               today
@@ -775,22 +839,50 @@ export default function App() {
           <div ref={messagesEndRef} />
         </div>
 
-        <InputArea 
-          onSendMessage={handleSendMessage} 
-          onSendFile={handleSendFile} 
-          onSendAudio={handleSendAudio}
-          isTyping={isNoaTyping} 
-        />
-      </div>
+          <InputArea 
+            onSendMessage={handleSendMessage} 
+            onSendFile={handleSendFile} 
+            onSendAudio={handleSendAudio}
+            isTyping={isNoaTyping} 
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
 
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
+    <style>{`
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 5px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      
+      @supports (padding-top: env(safe-area-inset-top)) {
+        .safe-top {
+          padding-top: env(safe-area-inset-top);
+          height: calc(60px + env(safe-area-inset-top));
         }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: rgba(0, 0, 0, 0.1);
+        .safe-bottom {
+          padding-bottom: env(safe-area-inset-bottom);
         }
-      `}</style>
-    </div>
-  );
+      }
+
+      /* Remove tap highlight on mobile */
+      * {
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+      }
+      input, p, h1, h2, h3, span {
+        user-select: text;
+      }
+      .touch-none {
+        touch-action: pan-y;
+      }
+    `}</style>
+  </div>
+);
 }
