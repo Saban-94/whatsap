@@ -74,20 +74,49 @@ Message: ${userText}
         const { startDate, endDate } = call.args as any;
         const searchDate = startDate || todayISO;
         
-        // Fetch a larger window and filter in-memory for flexibility (3 formats)
-        const snap = await getDocs(query(collection(db, 'orders'), limit(150)));
+        // Fetch a larger window and filter in-memory for flexibility
+        // Including all requested statuses: preparing, pending, processing, ready, delivered
+        const snap = await getDocs(query(collection(db, 'orders'), limit(200)));
         const allOrders = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
         
         const results = allOrders.filter((order: any) => {
-          if (!order.createdAt) return false;
+          // Priority 1: Exact match on 'date' field (YYYY-MM-DD)
+          if (order.date === searchDate) return true;
           
-          // Format 1: Firebase Timestamp
-          const ts = order.createdAt;
-          const dateFromTs = ts.toDate ? ts.toDate() : new Date(ts);
-          const iso = format(dateFromTs, 'yyyy-MM-dd');
-          const dmy = format(dateFromTs, 'dd/MM/yyyy');
+          // Priority 2: In-memory check of createdAt/updatedAt formats
+          if (order.createdAt) {
+            const ts = order.createdAt;
+            const dateFromTs = ts.toDate ? ts.toDate() : new Date(ts);
+            const iso = format(dateFromTs, 'yyyy-MM-dd');
+            const dmy = format(dateFromTs, 'dd/MM/yyyy');
+            if (iso === searchDate || dmy === searchDate) return true;
+          }
           
-          return iso === searchDate || dmy === searchDate || iso.includes(searchDate) || dmy.includes(searchDate);
+          return false;
+        }).map(order => {
+          // Driver Mapping Logic
+          const driverNames: Record<string, string> = {
+            'ali': 'עלי',
+            'noa': 'נועה',
+            'ramy': 'ראמי'
+          };
+          
+          return {
+            id: order.id,
+            customerName: order.customerName || order.customer || 'לקוח לא ידוע',
+            destination: order.destination || 'יעד לא צוין',
+            warehouse: order.warehouse || 'מחסן כללי',
+            status: order.status || 'pending',
+            items: order.items || [],
+            driver: order.driverId ? (driverNames[order.driverId.toLowerCase()] || order.driverId) : 'אין נהג משויך',
+            date: order.date,
+            createdAt: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : order.createdAt
+          };
+        }).sort((a, b) => {
+          // Sort by createdAt if available
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA; // Descending (newest first)
         });
 
         console.log(`[Noa Debug] get_orders_by_date results for "${searchDate}":`, results.length);
