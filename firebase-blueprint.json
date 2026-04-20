@@ -1,5 +1,19 @@
 {
   "entities": {
+    "Order": {
+      "title": "Order",
+      "description": "A logistics order",
+      "type": "object",
+      "properties": {
+        "customer": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered"] },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customer", "items", "status", "createdBy", "createdAt"]
+    },
     "User": {
       "title": "User",
       "description": "User profile information",
@@ -52,6 +66,10 @@
     "chats/{chatId}/messages/{messageId}": {
       "schema": "Message",
       "description": "Messages within a chat"
+    },
+    "orders/{orderId}": {
+      "schema": "Order",
+      "description": "Logistics orders and scheduling"
     }
   }
 }

@@ -45,7 +45,7 @@ import {
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db, signIn, signOut } from './lib/firebase';
 import { cn } from './lib/utils';
-import { ChatMetadata, Message, UserProfile } from './types';
+import { ChatMetadata, Message, UserProfile, Order } from './types';
 import { ai, NOA_SYSTEM_INSTRUCTION } from './lib/ai';
 
 // --- Components ---
@@ -568,6 +568,57 @@ export default function App() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Orders Real-time Bridge & Notifications
+  useEffect(() => {
+    if (!user) return;
+
+    // Request notification permission once
+    if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+      Notification.requestPermission();
+    }
+
+    const q = query(
+      collection(db, 'orders'),
+      orderBy('createdAt', 'desc'),
+      limit(5)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach(async (change) => {
+        if (change.type === "added") {
+          const order = change.doc.data() as Order;
+          const orderTime = order.createdAt?.toMillis() || 0;
+          const now = Date.now();
+          
+          // Only notify for fresh orders (last 30 seconds) not created by Noa itself to avoid loops
+          if (now - orderTime < 30000 && order.createdBy !== 'noa') {
+            const chatId = `chat_${user.uid}_noa`;
+            
+            // Add automatic Noa message to chat
+            await addDoc(collection(db, 'chats', chatId, 'messages'), {
+              text: `🚀 ראמי נשמה, נכנסה הזמנה חדשה בסידור! \nלקוח: ${order.customer}\nפריטים: ${order.items.join(', ')}\nמצב הסידור כרגע מתעדכן...`,
+              senderId: 'noa',
+              senderName: 'Noa AI',
+              status: 'sent',
+              type: 'text',
+              createdAt: serverTimestamp()
+            });
+
+            // Native Push Notification Simulation
+            if ("Notification" in window && Notification.permission === "granted") {
+              new Notification("SabanOS: הזמנה חדשה", {
+                body: `נכנסה הזמנה מ-${order.customer}`,
+                icon: "https://picsum.photos/seed/sabanos/192/192"
+              });
+            }
+          }
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [user]);
   
   // Sound effect
   const playTick = () => {
@@ -778,6 +829,42 @@ export default function App() {
 
       const reply = response.text || "סליחה, אירעה שגיאה בעיבוד הבקשה.";
       
+      // Multi-DB Bridge Logic: Detect intent to open an order
+      if (reply.includes("פתחתי הזמנה") || reply.includes("בטיפול: פתיחת הזמנה")) {
+        const customerMatch = userText.match(/הזמנה ל([א-ת]+)/) || reply.match(/לקוח: ([א-ת]+)/);
+        const customer = customerMatch ? customerMatch[1] : "לקוח כללי";
+        
+        await addDoc(collection(db, 'orders'), {
+          customer,
+          items: ["פריטים מהצ'אט"],
+          status: 'pending',
+          createdBy: 'noa',
+          createdAt: serverTimestamp()
+        });
+      }
+
+      // Query Engine Logic: Handle status queries
+      if (userText.includes("מצב ההזמנות") || userText.includes("כמה הזמנות")) {
+        const ordersSnap = await getDocs(collection(db, 'orders'));
+        const pending = ordersSnap.docs.filter(d => d.data().status === 'pending').length;
+        const processing = ordersSnap.docs.filter(d => d.data().status === 'processing').length;
+        
+        const statusReply = `ראמי, בדקתי במערכת: יש לנו כרגע ${pending} הזמנות בסטטוס pending ו-${processing} בסטטוס processing. סה"כ ${ordersSnap.size} הזמנות רשומות להיום.`;
+        
+        setTimeout(async () => {
+          await addDoc(collection(db, 'chats', chatId, 'messages'), {
+            text: statusReply,
+            senderId: 'noa',
+            senderName: 'Noa AI',
+            status: 'sent',
+            type: 'text',
+            createdAt: serverTimestamp()
+          });
+          setIsNoaTyping(false);
+        }, 1000);
+        return; // Skip standard reply display
+      }
+
       // Simulate delay for natural feel
       setTimeout(async () => {
         await addDoc(collection(db, 'chats', chatId, 'messages'), {

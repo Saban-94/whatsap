@@ -71,5 +71,24 @@ service cloud.firestore {
                     (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']))
                     );
     }
+
+    // Order validation
+    function isValidOrder(data) {
+      return data.keys().hasAll(['customer', 'items', 'status', 'createdBy', 'createdAt']) &&
+             data.customer is string && data.customer.size() <= 200 &&
+             data.items is list && data.items.size() <= 100 &&
+             data.status in ['pending', 'processing', 'shipped', 'delivered'] &&
+             isValidId(data.createdBy) &&
+             data.createdAt == request.time;
+    }
+
+    match /orders/{orderId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidOrder(request.resource.data);
+      allow update: if isSignedIn() && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+        request.resource.data.updatedAt == request.time
+      );
+    }
   }
 }

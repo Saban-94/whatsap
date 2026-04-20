@@ -30,3 +30,13 @@ export interface Message {
   reactions?: Record<string, string[]>; // emoji -> list of userIds
   createdAt: Timestamp;
 }
+
+export interface Order {
+  id?: string;
+  customer: string;
+  items: string[];
+  status: 'pending' | 'processing' | 'shipped' | 'delivered';
+  createdBy: string;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+}
