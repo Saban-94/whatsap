@@ -431,7 +431,15 @@ export default function App() {
   const [isNoaTyping, setIsNoaTyping] = useState(false);
   const [activeView, setActiveView] = useState<'sidebar' | 'chat'>('sidebar');
   const [isMobile, setIsMobile] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleActiveViewChange = (view: 'sidebar' | 'chat') => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
+    setActiveView(view);
+    setTimeout(() => setIsTransitioning(false), 400); // Buffer for animation
+  };
 
   // Check for mobile
   useEffect(() => {
@@ -689,17 +697,17 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen bg-[#dadbd3] flex overflow-hidden font-sans select-none touch-none" dir="rtl">
+    <div className="h-[100dvh] bg-[#dadbd3] flex overflow-hidden font-sans select-none touch-pan-y" dir="rtl">
       {/* Sidebar - Contacts */}
       <AnimatePresence mode="wait">
         {(!isMobile || activeView === 'sidebar') && (
           <motion.div 
-            initial={isMobile ? { x: 300 } : false}
+            initial={isMobile ? { x: "100%" } : false}
             animate={{ x: 0 }}
-            exit={{ x: 300 }}
+            exit={isMobile ? { x: "100%" } : { opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className={cn(
-              "bg-white border-l border-gray-300 flex flex-col z-20 transition-all shadow-lg",
+              "bg-white border-l border-gray-300 flex flex-col z-20 transition-all shadow-lg overflow-hidden",
               isMobile ? "fixed inset-0 w-full" : "relative w-[30%] lg:w-[25%] md:shadow-none"
             )}
           >
@@ -714,7 +722,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="p-3 bg-white">
+            <div className="p-3 bg-white shrink-0">
               <div className="bg-[#f0f2f5] rounded-xl flex items-center px-3 py-2 gap-4">
                 <Search className="w-4 h-4 text-gray-500 shrink-0" />
                 <input 
@@ -726,8 +734,8 @@ export default function App() {
 
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               <div 
-                onClick={() => isMobile && setActiveView('chat')}
-                className="flex items-center px-4 py-3 gap-3 bg-[#f0f2f5] cursor-pointer hover:bg-white transition-colors border-b border-gray-100"
+                onClick={() => isMobile && handleActiveViewChange('chat')}
+                className="flex items-center px-4 py-3 gap-3 bg-[#f0f2f5] cursor-pointer hover:bg-white transition-colors border-b border-gray-100 active:bg-gray-200"
               >
                 <div className="w-12 h-12 rounded-full bg-[#00a884] flex items-center justify-center text-white shrink-0 overflow-hidden shadow-sm">
                   <img src="https://picsum.photos/seed/noa-ai/100" alt="Noa AI" referrerPolicy="no-referrer" />
@@ -752,8 +760,8 @@ export default function App() {
               </div>
               
               {/* Demo Contacts */}
-              {[1, 2].map(i => (
-                <div key={i} className="flex items-center px-4 py-3 gap-3 cursor-pointer hover:bg-gray-50 transition-colors border-b border-white opacity-80">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="flex items-center px-4 py-3 gap-3 cursor-pointer hover:bg-gray-50 transition-colors border-b border-white opacity-80 active:bg-gray-100">
                   <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden shrink-0">
                     <img src={`https://picsum.photos/seed/user-${i}/100`} alt="demo" referrerPolicy="no-referrer" />
                   </div>
@@ -761,7 +769,7 @@ export default function App() {
                     <div className="flex justify-between items-center mb-0.5">
                       <div className="flex items-center gap-2">
                         <h3 className="text-sm font-medium text-[#111b21] truncate">צוות שטח {i}</h3>
-                        <StatusIndicator status={i === 1 ? 'away' : 'offline'} />
+                        <StatusIndicator status={i % 2 === 0 ? 'online' : 'offline'} />
                       </div>
                       <span className="text-[10px] text-gray-400">14:50</span>
                     </div>
@@ -773,16 +781,16 @@ export default function App() {
 
             {/* Mobile Bottom Nav */}
             {isMobile && (
-              <div className="h-[70px] bg-[#f0f2f5] border-t border-gray-200 flex items-center justify-around px-6 safe-bottom">
-                <div className="flex flex-col items-center gap-1 text-[#00a884]">
+              <div className="h-[70px] bg-[#f0f2f5] border-t border-gray-200 flex items-center justify-around px-6 safe-bottom shrink-0">
+                <div className="flex flex-col items-center gap-1 text-[#00a884] cursor-pointer">
                   <MessageSquare className="w-6 h-6" />
                   <span className="text-[10px] font-bold">צ'אטים</span>
                 </div>
-                <div className="flex flex-col items-center gap-1 text-gray-400">
+                <div className="flex flex-col items-center gap-1 text-gray-400 cursor-pointer">
                   <LayoutGrid className="w-6 h-6" />
                   <span className="text-[10px]">משימות</span>
                 </div>
-                <div className="flex flex-col items-center gap-1 text-gray-400">
+                <div className="flex flex-col items-center gap-1 text-gray-400 cursor-pointer">
                   <Settings className="w-6 h-6" />
                   <span className="text-[10px]">הגדרות</span>
                 </div>
@@ -796,9 +804,9 @@ export default function App() {
       <AnimatePresence mode="wait">
         {(!isMobile || activeView === 'chat') && (
           <motion.div 
-            initial={isMobile ? { x: -300 } : false}
+            initial={isMobile ? { x: "-100%" } : false}
             animate={{ x: 0 }}
-            exit={{ x: -300 }}
+            exit={isMobile ? { x: "-100%" } : { opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className="flex-1 flex flex-col h-full bg-[#efeae2] relative shadow-inner overflow-hidden"
           >
@@ -807,7 +815,7 @@ export default function App() {
               toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
               isSidebarOpen={isSidebarOpen} 
               isMobile={isMobile}
-              onBack={isMobile ? () => setActiveView('sidebar') : undefined}
+              onBack={isMobile ? () => handleActiveViewChange('sidebar') : undefined}
             />
         
         {/* Messages List */}
@@ -850,37 +858,47 @@ export default function App() {
     </AnimatePresence>
 
     <style>{`
+      html, body, #root {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        overscroll-behavior-y: none;
+      }
+
       .custom-scrollbar::-webkit-scrollbar {
-        width: 5px;
+        width: 4px;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb {
         background-color: rgba(0, 0, 0, 0.1);
         border-radius: 10px;
       }
-      .custom-scrollbar::-webkit-scrollbar-track {
-        background: transparent;
-      }
       
       @supports (padding-top: env(safe-area-inset-top)) {
         .safe-top {
           padding-top: env(safe-area-inset-top);
-          height: calc(60px + env(safe-area-inset-top));
+          min-height: calc(60px + env(safe-area-inset-top));
         }
         .safe-bottom {
           padding-bottom: env(safe-area-inset-bottom);
         }
       }
 
-      /* Remove tap highlight on mobile */
+      /* Fix mobile tapping and layout */
       * {
         -webkit-tap-highlight-color: transparent;
-        user-select: none;
       }
+      
+      body {
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .touch-pan-y {
+        touch-action: pan-y;
+      }
+
       input, p, h1, h2, h3, span {
         user-select: text;
-      }
-      .touch-none {
-        touch-action: pan-y;
       }
     `}</style>
   </div>
