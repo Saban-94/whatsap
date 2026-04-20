@@ -178,6 +178,7 @@ MORNING REPORTS & DATA:
 ORDER DEEP DIVE & UI:
 - When performing a Deep Dive (especially for results like Zabulon or specified orders), use Markdown to create a "Checklist" representation of items.
 - Format: Use GFM style checkboxes for items: "- [ ] 10x Product Name".
+- MANDATORY: If the 'items' field contains text, you MUST display it in full exactly as it is, even if you cannot parse it into a neat list. DO NOT send a message without the items list.
 - This allows the user to "check off" items during loading.
 
 DRIVER BRIEFS:

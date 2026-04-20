@@ -77,13 +77,16 @@ Message: ${userText}
           const snap = await getDocs(q);
           let results = snap.docs.map(d => {
             const data = d.data() as any;
+            // Raw String Injection for items
+            const rawItems = Array.isArray(data.items) ? data.items.join(', ') : (data.items || '');
+            
             return {
               id: d.id,
-              customerName: data.customerName || data.customer || 'לקוח לא ידוע',
+              customer: data.customerName || data.customer || 'לקוח לא ידוע',
               destination: data.destination || 'יעד לא צוין',
               warehouse: data.warehouse || 'מחסן כללי',
               status: data.status || 'pending',
-              items: data.items || [],
+              items: rawItems,
               date: data.date,
               driverId: data.driverId
             };
@@ -94,14 +97,12 @@ Message: ${userText}
             const searchSlug = lowerQuery.split(/[\s\-/]/)[0]; 
 
             results = results.filter((r: any) => {
-              const customerNameLower = (r.customerName || '').toLowerCase();
+              const customerLower = (r.customer || '').toLowerCase();
               const destinationLower = (r.destination || '').toLowerCase();
-              const itemsStr = Array.isArray(r.items) 
-                ? r.items.join(' ').toLowerCase() 
-                : (typeof r.items === 'string' ? r.items.toLowerCase() : '');
+              const itemsStr = (r.items || '').toLowerCase();
 
-              return customerNameLower.includes(lowerQuery) || 
-                     customerNameLower.includes(searchSlug) ||
+              return customerLower.includes(lowerQuery) || 
+                     customerLower.includes(searchSlug) ||
                      destinationLower.includes(lowerQuery) ||
                      itemsStr.includes(lowerQuery);
             });
@@ -112,16 +113,16 @@ Message: ${userText}
 
         } else if (call.name === "get_order_details") {
           const { orderId, customerName } = call.args as any;
-          let result = null;
+          let orderData: any = null;
 
           if (orderId) {
             const orderDoc = await getDoc(doc(db, 'orders', orderId));
             if (orderDoc.exists()) {
-              result = { id: orderDoc.id, ...orderDoc.data() };
+              orderData = { id: orderDoc.id, ...orderDoc.data() };
             }
           }
 
-          if (!result && customerName) {
+          if (!orderData && customerName) {
             const lowerCName = customerName.toLowerCase();
             const searchSlug = lowerCName.split(/[\s\-/]/)[0];
             const snap = await getDocs(query(collection(db, 'orders'), limit(300)));
@@ -131,13 +132,29 @@ Message: ${userText}
               return name.includes(lowerCName) || name.includes(searchSlug);
             });
             if (match) {
-              result = { id: match.id, ...match.data() };
+              orderData = { id: match.id, ...match.data() };
             }
           }
 
-          console.log(`[Noa Debug] get_order_details for "${orderId || customerName}":`, result ? "Found" : "Not Found");
-          toolOutputs.push({ name: call.name, output: { content: JSON.stringify(result) }, id: (call as any).id });
-
+          if (orderData) {
+            // Raw String Injection for items
+            const rawItems = Array.isArray(orderData.items) ? orderData.items.join(', ') : (orderData.items || '');
+            
+            // Flat Tool Response as requested: { items, customer, orderId }
+            const flatResult = {
+              items: rawItems,
+              customer: orderData.customerName || orderData.customer || 'לקוח לא ידוע',
+              orderId: orderData.id,
+              destination: orderData.destination,
+              status: orderData.status,
+              driverId: orderData.driverId
+            };
+            
+            console.log(`[Noa Debug] get_order_details found:`, flatResult.customer);
+            toolOutputs.push({ name: call.name, output: { content: JSON.stringify(flatResult) }, id: (call as any).id });
+          } else {
+            toolOutputs.push({ name: call.name, output: { content: JSON.stringify({ error: "Order not found" }) }, id: (call as any).id });
+          }
         } else if (call.name === "get_orders_by_date") {
           const { startDate } = call.args as any;
           const searchDate = startDate || todayISO;
@@ -152,14 +169,17 @@ Message: ${userText}
               if (format(dateFromTs, 'yyyy-MM-dd') === searchDate) return true;
             }
             return false;
-          }).map(order => ({
-            id: order.id,
-            customerName: order.customerName || order.customer || 'לקוח לא ידוע',
-            destination: order.destination || 'יעד לא צוין',
-            status: order.status || 'pending',
-            items: order.items || [],
-            date: order.date
-          }));
+          }).map(order => {
+            const rawItems = Array.isArray(order.items) ? order.items.join(', ') : (order.items || '');
+            return {
+              id: order.id,
+              customer: order.customerName || order.customer || 'לקוח לא ידוע',
+              destination: order.destination || 'יעד לא צוין',
+              status: order.status || 'pending',
+              items: rawItems,
+              date: order.date
+            };
+          });
 
           console.log(`[Noa Debug] get_orders_by_date results for "${searchDate}":`, results.length);
           toolOutputs.push({ name: call.name, output: { content: JSON.stringify(results) }, id: (call as any).id });
