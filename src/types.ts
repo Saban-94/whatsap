@@ -59,3 +59,12 @@ export interface StaffProfile {
   calendarEnabled: boolean;
   updatedAt?: Timestamp;
 }
+
+export interface NotificationPreferences {
+  enabled: boolean;
+  sound: 'default' | 'chime' | 'none';
+  vibration: boolean;
+  dndEnabled: boolean;
+  dndStart: string; // "HH:mm"
+  dndEnd: string;   // "HH:mm"
+}
