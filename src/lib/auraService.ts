@@ -18,7 +18,7 @@ export const processNoaTurn = async (userText: string, user: any) => {
   const todayISO = format(now, 'yyyy-MM-dd');
 
   let displayName = user.displayName || 'ראמי';
-  if (displayName === 'Saban' || displayName === 'ח. סבן') {
+  if (displayName === 'Saban' || displayName === 'ח. סבן' || displayName.includes('Saban')) {
     displayName = 'ראמי נשמה';
   } else {
     displayName = displayName.split(' ')[0];
@@ -45,29 +45,54 @@ Message: ${userText}
     for (const call of response.functionCalls) {
       if (call.name === "search_orders") {
         const { query: qStr, status: sStr } = call.args as any;
+        const cleanQuery = qStr?.trim();
+        const cleanStatus = sStr?.trim();
+        
         let ordersRef = collection(db, 'orders');
         let q;
-        if (sStr) {
-           q = query(ordersRef, where('status', '==', sStr));
+        if (cleanStatus) {
+           q = query(ordersRef, where('status', '==', cleanStatus));
         } else {
-           q = query(ordersRef, limit(20));
+           q = query(ordersRef, limit(100));
         }
+        
         const snap = await getDocs(q);
         let results = snap.docs.map(d => ({ id: d.id, ...(d.data() as object) }));
-        if (qStr) {
+        
+        if (cleanQuery) {
+          const lowerQuery = cleanQuery.toLowerCase();
           results = results.filter((r: any) => 
-            r.customer?.includes(qStr) || 
-            r.items?.some((i: string) => i.includes(qStr))
+            (r.customer && r.customer.toLowerCase().includes(lowerQuery)) || 
+            (r.items && r.items.some((i: string) => i.toLowerCase().includes(lowerQuery)))
           );
         }
+        
+        console.log(`[Noa Debug] search_orders results for "${cleanQuery}":`, results.length);
         toolOutputs.push({ name: call.name, output: results, id: (call as any).id });
+
       } else if (call.name === "get_orders_by_date") {
         const { startDate, endDate } = call.args as any;
-        // Use todayISO if dates are missing, otherwise use provided dates
-        const start = startDate || todayISO;
-        const snap = await getDocs(query(collection(db, 'orders'), limit(50)));
-        const results = snap.docs.map(d => ({ id: d.id, ...(d.data() as object) }));
+        const searchDate = startDate || todayISO;
+        
+        // Fetch a larger window and filter in-memory for flexibility (3 formats)
+        const snap = await getDocs(query(collection(db, 'orders'), limit(150)));
+        const allOrders = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+        
+        const results = allOrders.filter((order: any) => {
+          if (!order.createdAt) return false;
+          
+          // Format 1: Firebase Timestamp
+          const ts = order.createdAt;
+          const dateFromTs = ts.toDate ? ts.toDate() : new Date(ts);
+          const iso = format(dateFromTs, 'yyyy-MM-dd');
+          const dmy = format(dateFromTs, 'dd/MM/yyyy');
+          
+          return iso === searchDate || dmy === searchDate || iso.includes(searchDate) || dmy.includes(searchDate);
+        });
+
+        console.log(`[Noa Debug] get_orders_by_date results for "${searchDate}":`, results.length);
         toolOutputs.push({ name: call.name, output: results, id: (call as any).id });
+
       } else if (call.name === "create_order") {
         const { customer, items } = call.args as any;
         const docRef = await addDoc(collection(db, 'orders'), {
