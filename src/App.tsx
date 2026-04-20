@@ -46,7 +46,8 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db, signIn, signOut } from './lib/firebase';
 import { cn } from './lib/utils';
 import { ChatMetadata, Message, UserProfile, Order } from './types';
-import { ai, NOA_SYSTEM_INSTRUCTION, searchOrdersTool, getOrdersByDateTool, createOrderTool } from './lib/ai';
+import { ai, NOA_SYSTEM_INSTRUCTION } from './lib/ai';
+import { processNoaTurn } from './lib/auraService';
 
 // --- Components ---
 
@@ -806,7 +807,7 @@ export default function App() {
     const chatId = `chat_${user.uid}_noa`;
 
     try {
-      // Mark user messages as read when Noa starts typing or responding
+      // Mark user messages as read
       const userMsgsQuery = query(
         collection(db, 'chats', chatId, 'messages'),
         where('senderId', '==', user.uid),
@@ -819,79 +820,7 @@ export default function App() {
         });
       });
 
-      const firstName = user.displayName?.split(' ')[0] || 'ראמי';
-      const prompt = `User Name: ${firstName}. Message: ${userText}`;
-
-      let response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          systemInstruction: NOA_SYSTEM_INSTRUCTION,
-          tools: [{ functionDeclarations: [searchOrdersTool, getOrdersByDateTool, createOrderTool] }]
-        }
-      });
-
-      // Handle function calls
-      if (response.functionCalls) {
-        const toolOutputs = [];
-        for (const call of response.functionCalls) {
-          if (call.name === "search_orders") {
-            const { query: qStr, status: sStr } = call.args as any;
-            let ordersRef = collection(db, 'orders') as any;
-            let q;
-            if (sStr) {
-               q = query(ordersRef, where('status', '==', sStr));
-            } else {
-               q = query(ordersRef, limit(20));
-            }
-            const snap = await getDocs(q);
-            let results = snap.docs.map(d => ({ id: d.id, ...(d.data() as object) }));
-            if (qStr) {
-              results = results.filter((r: any) => 
-                r.customer?.includes(qStr) || 
-                r.items?.some((i: string) => i.includes(qStr))
-              );
-            }
-            toolOutputs.push({ callId: (call as any).id, output: results });
-          } else if (call.name === "get_orders_by_date") {
-            const snap = await getDocs(query(collection(db, 'orders'), limit(50)));
-            const results = snap.docs.map(d => ({ id: d.id, ...(d.data() as object) }));
-            toolOutputs.push({ callId: (call as any).id, output: results });
-          } else if (call.name === "create_order") {
-            const { customer, items } = call.args as any;
-            const docRef = await addDoc(collection(db, 'orders'), {
-              customer,
-              items: items || ["פריטים מהצ'אט"],
-              status: 'pending',
-              createdBy: 'noa',
-              createdAt: serverTimestamp()
-            });
-            toolOutputs.push({ callId: (call as any).id, output: { success: true, orderId: docRef.id } });
-          }
-        }
-
-        // Send results back to model with full previous context to preserve thought_signature
-        response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: [
-            { role: 'user', parts: [{ text: prompt }] },
-            response.candidates[0].content, // Use the full original content (includes thought_signature + functionCalls)
-            { 
-              role: 'user', 
-              parts: toolOutputs.map((o, idx) => ({ 
-                functionResponse: { 
-                  name: response.functionCalls![idx].name, 
-                  response: { content: o.output },
-                  id: (response.functionCalls![idx] as any).id
-                } 
-              })) 
-            }
-          ],
-          config: { systemInstruction: NOA_SYSTEM_INSTRUCTION }
-        });
-      }
-
-      const reply = response.text || "סליחה, אירעה שגיאה בעיבוד הבקשה.";
+      const reply = await processNoaTurn(userText, user) || "סליחה, אירעה שגיאה בעיבוד הבקשה.";
       
       // Simulate delay for natural feel
       setTimeout(async () => {
@@ -904,8 +833,7 @@ export default function App() {
           createdAt: serverTimestamp()
         });
         setIsNoaTyping(false);
-        // Maybe update all user messages to 'read'
-      }, 1500);
+      }, 500); // Shorter delay as service already has its own processing time
 
     } catch (error) {
       console.error("AI Error:", error);
