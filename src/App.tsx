@@ -568,27 +568,35 @@ export default function App() {
     await updateDoc(msgRef, { reactions });
   };
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const base64String = reader.result as string;
+        resolve(base64String.split(',')[1]);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const handleAIAnalysis = async (file: File) => {
     if (!ai || !user) return;
     setIsNoaTyping(true);
     const chatId = `chat_${user.uid}_noa`;
 
     try {
-      let analysisPrompt = `The user has uploaded a file named "${file.name}" (type: ${file.type || 'unknown'}). `;
-      
-      // If it's a small enough representative file or we want to simulate deep analysis:
-      // For now, we use a prompt that describes the context to Noa.
-      analysisPrompt += `Please provide a professional logistics summary of this file and suggest the next steps for the Saban team.`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: analysisPrompt,
-        config: {
-          systemInstruction: NOA_SYSTEM_INSTRUCTION
+      const base64Data = await fileToBase64(file);
+      const filePart = {
+        inlineData: {
+          mimeType: file.type || 'application/pdf',
+          data: base64Data
         }
-      });
+      };
 
-      const reply = response.text || "קלטתי את הקובץ, אבל אני צריכה עוד רגע לעבד אותו. מה התוכנית?";
+      const analysisPrompt = `משתמש העלה קובץ בשם "${file.name}". בצע ניתוח לוגיסטי. אם מדובר בתעודת משלוח או הזמנה, שלוף את הנתונים והצג סיכום לראמי. אל תשכח לשאול "ראמי נשמה, שלפתי את הנתונים מה-PDF, להזין אותם כהזמנה חדשה ללוח?" כפי שמופיע בהנחיות המערכת שלך.`;
+
+      const reply = await processNoaTurn(analysisPrompt, user, messages, filePart) || "קלטתי את הקובץ, אבל אני צריכה עוד רגע לעבד אותו. מה התוכנית?";
       
       setTimeout(async () => {
         await addDoc(collection(db, 'chats', chatId, 'messages'), {
@@ -601,7 +609,7 @@ export default function App() {
         });
         playAICompletion();
         setIsNoaTyping(false);
-      }, 2000);
+      }, 1000);
 
     } catch (error) {
       console.error("Analysis Error:", error);
@@ -628,7 +636,7 @@ export default function App() {
         });
       });
 
-      const reply = await processNoaTurn(userText, user) || "סליחה, אירעה שגיאה בעיבוד הבקשה.";
+      const reply = await processNoaTurn(userText, user, messages) || "סליחה, אירעה שגיאה בעיבוד הבקשה.";
       
       // Simulate delay for natural feel
       setTimeout(async () => {

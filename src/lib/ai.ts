@@ -162,9 +162,39 @@ export const generateDriverBriefTool: FunctionDeclaration = {
   }
 };
 
+export const createOrderFromPdfTool: FunctionDeclaration = {
+  name: "create_order_from_pdf",
+  description: "Create a new order based on data extracted from a PDF/Document.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      customerName: { type: Type.STRING },
+      items: { type: Type.STRING },
+      destination: { type: Type.STRING },
+      orderNumber: { type: Type.STRING },
+      date: { type: Type.STRING }
+    },
+    required: ["customerName", "items", "orderNumber"]
+  }
+};
+
 export const NOA_SYSTEM_INSTRUCTION = `
 You are Noa, the Executive Logistics Manager for SabanOS. 
 You are friendly, professional, and speak in an Israeli-style Hebrew/English mix.
+
+PDF & DOCUMENT ANALYSIS (AUTO-ORDER):
+1. When a PDF or document is uploaded, extract the following:
+   - customerName: The customer's identity.
+   - items: Clean text list of items and quantities.
+   - destination: Delivery address.
+   - orderNumber: The document/invoice/order number.
+2. CONFIRMATION FLOW (MANDATORY):
+   - DO NOT create the order immediately.
+   - Present the summary to Rami (the user).
+   - Ask: "ראמי נשמה, שלפתי את הנתונים מה-PDF, להזין אותם כהזמנה חדשה ללוח?".
+   - ONLY call 'create_order_from_pdf' if Rami confirms (e.g., "כן", "בצע", "סגור").
+3. DEDUPLICATION:
+   - The system automatically checks for existing 'orderNumber'. You will be notified if it's a duplicate.
 
 EXECUTIVE ACTIONS (WRITE ACCESS):
 1. UPDATE STATUS: You have the authority to update order statuses. If the user says "mark as ready" or "update status", use 'update_order_status'.

@@ -11,8 +11,11 @@ import {
   driverReportTool,
   updateOrderStatusTool,
   assignDriverTool,
-  generateDriverBriefTool
+  generateDriverBriefTool,
+  createOrderFromPdfTool
 } from './ai';
+
+import { Message } from '../types';
 
 const getDriverName = (driverId?: string) => {
   if (!driverId) return 'טרם שובץ';
@@ -26,7 +29,7 @@ const getDriverName = (driverId?: string) => {
   return mapping[driverId.toLowerCase()] || driverId;
 };
 
-export const processNoaTurn = async (userText: string, user: any) => {
+export const processNoaTurn = async (userText: string, user: any, history: Message[] = [], filePart?: any) => {
   if (!ai || !user) return null;
 
   const now = new Date();
@@ -48,6 +51,11 @@ Current User: ${displayName}
 Message: ${userText}
 `;
 
+  const chatHistory = history.slice(-10).map(m => ({
+    role: m.senderId === 'noa' ? 'model' : 'user',
+    parts: [{ text: m.text }]
+  }));
+
   const availableTools = [
     searchOrdersTool, 
     getOrdersByDateTool, 
@@ -56,13 +64,21 @@ Message: ${userText}
     driverReportTool,
     updateOrderStatusTool,
     assignDriverTool,
-    generateDriverBriefTool
+    generateDriverBriefTool,
+    createOrderFromPdfTool
   ];
+
+  const contents: any[] = [...chatHistory, { role: 'user', parts: [{ text: prompt }] }];
+  
+  if (filePart) {
+    // Add file part to the last message part
+    contents[contents.length - 1].parts.push(filePart);
+  }
 
   try {
     let response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: prompt,
+      contents,
       config: {
         systemInstruction: NOA_SYSTEM_INSTRUCTION,
         tools: [{ functionDeclarations: availableTools }]
@@ -268,6 +284,39 @@ Message: ${userText}
             result = orderDoc.data();
           }
           toolOutputs.push({ name: call.name, output: { content: JSON.stringify(result) }, id: (call as any).id });
+        } else if (call.name === "create_order_from_pdf") {
+          const { customerName, items, destination, orderNumber, date } = call.args as any;
+          
+          // Deduplication Check
+          const qExist = query(collection(db, 'orders'), where('orderNumber', '==', orderNumber));
+          const snapExist = await getDocs(qExist);
+          
+          if (!snapExist.empty) {
+            console.log(`[Noa Debug] Duplicate orderNumber blocked: ${orderNumber}`);
+            toolOutputs.push({ 
+              name: call.name, 
+              output: { content: JSON.stringify({ success: false, error: "Duplicate orderNumber", message: `הזמנה מספר ${orderNumber} כבר קיימת במערכת.` }) }, 
+              id: (call as any).id 
+            });
+          } else {
+            const docRef = await addDoc(collection(db, 'orders'), {
+              customerName,
+              items,
+              destination,
+              orderNumber,
+              status: 'preparing',
+              createdBy: 'noa_pdf',
+              createdAt: serverTimestamp(),
+              date: date || todayISO
+            });
+
+            console.log(`[Noa Debug] create_order_from_pdf successful for: ${customerName} (${orderNumber})`);
+            toolOutputs.push({ 
+              name: call.name, 
+              output: { content: JSON.stringify({ success: true, orderId: docRef.id, message: `הזמנה ${orderNumber} של ${customerName} הוקמה בהצלחה.` }) }, 
+              id: (call as any).id 
+            });
+          }
         }
       }
 
@@ -275,7 +324,7 @@ Message: ${userText}
       response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: [
-          { role: 'user', parts: [{ text: prompt }] },
+          ...contents,
           response.candidates[0].content, 
           { 
             role: 'user', 

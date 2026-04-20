@@ -33,6 +33,7 @@ export interface Message {
 
 export interface Order {
   id?: string;
+  orderNumber?: string;
   customer: string;
   customerName?: string;
   items: string;
