@@ -1,0 +1,57 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "lastSeen": { "type": "string", "format": "date-time" },
+        "isTyping": { "type": "boolean" }
+      },
+      "required": ["displayName"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "A conversation between users or with the AI",
+      "type": "object",
+      "properties": {
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "lastMessage": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "title": { "type": "string" }
+      }
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A message in a chat",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "status": { "type": "string", "enum": ["sent", "read"] },
+        "type": { "type": "string", "enum": ["text", "file"] },
+        "fileUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId", "text", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Chat metadata"
+    },
+    "chats/{chatId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages within a chat"
+    }
+  }
+}
