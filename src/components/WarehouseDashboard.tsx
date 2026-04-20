@@ -9,7 +9,8 @@ import {
   Map,
   Truck,
   History,
-  RefreshCcw
+  RefreshCcw,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   collection, 
@@ -146,15 +147,29 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = ({ onBack }
                 <div 
                   key={order.id}
                   className={cn(
-                    "bg-white rounded-2xl border p-4 shadow-sm transition-all hover:shadow-md",
-                    order.status === 'ready' ? "border-green-100 bg-green-50/30" : "border-gray-100"
+                    "bg-white rounded-2xl border p-4 shadow-sm transition-all hover:shadow-md relative overflow-hidden",
+                    order.status === 'ready' ? "border-green-100 bg-green-50/30" : "border-gray-100",
+                    order.isUrgent && "border-red-500 bg-red-50 ring-1 ring-red-500 shadow-red-100"
                   )}
                 >
+                  {order.isUrgent && (
+                    <div className="absolute top-0 right-0 left-0 h-1 bg-red-500" />
+                  )}
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-[#111b21] truncate">
-                        {getCustomerDisplay(order)}
-                      </h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-[#111b21] truncate">
+                          {getCustomerDisplay(order)}
+                        </h3>
+                        {order.isUrgent && (
+                           <motion.div
+                             animate={{ scale: [1, 1.1, 1] }}
+                             transition={{ repeat: Infinity, duration: 1.5 }}
+                           >
+                             <AlertTriangle className="w-4 h-4 text-red-600 fill-red-100" />
+                           </motion.div>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1.5 text-[11px] text-gray-400 mt-0.5">
                         <Clock className="w-3 h-3" />
                         <span>נוצר: {order.date || 'היום'}</span>

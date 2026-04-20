@@ -1,7 +1,10 @@
-import React from 'react';
-import { CheckSquare, Package, MapPin, User, Hash } from 'lucide-react';
+import React, { useState } from 'react';
+import { CheckSquare, Package, MapPin, User, Hash, AlertTriangle, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { getCustomerDisplay } from '../lib/orderUtils';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { motion } from 'motion/react';
 
 interface DeepDiveCardProps {
   order: {
@@ -13,11 +16,29 @@ interface DeepDiveCardProps {
     driverId?: string;
     driverName?: string;
     id?: string;
+    isUrgent?: boolean;
   };
 }
 
 export const DeepDiveCard: React.FC<DeepDiveCardProps> = ({ order }) => {
+  const [isUpdating, setIsUpdating] = useState(false);
   const customerName = getCustomerDisplay(order as any);
+
+  const toggleUrgent = async () => {
+    if (!order.id) return;
+    setIsUpdating(true);
+    try {
+      await updateDoc(doc(db, 'orders', order.id), {
+        isUrgent: !order.isUrgent,
+        updatedAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.error("Error updating urgency:", err);
+      // alert("Error updating urgency");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
   
   // Logic to parse items string as requested by the user
   const parseItems = (itemsInput: string | string[]) => {
@@ -68,27 +89,71 @@ export const DeepDiveCard: React.FC<DeepDiveCardProps> = ({ order }) => {
   const itemsList = parseItems(order.items || '');
 
   return (
-    <div className="bg-white border border-[#00a884]/20 rounded-xl overflow-hidden shadow-md my-2 max-w-full">
-      <div className="bg-[#00a884] px-4 py-2 text-white flex items-center justify-between">
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={cn(
+        "bg-white border rounded-xl overflow-hidden shadow-md my-2 max-w-full transition-all duration-300",
+        order.isUrgent ? "border-red-500 ring-2 ring-red-500/20 shadow-red-100" : "border-[#00a884]/20"
+      )}
+    >
+      <div className={cn(
+        "px-4 py-2 text-white flex items-center justify-between",
+        order.isUrgent ? "bg-red-600 shadow-inner" : "bg-[#00a884]"
+      )}>
         <div className="flex items-center gap-2">
-          <Hash className="w-4 h-4 opacity-70" />
-          <span className="text-xs font-bold font-mono">{order.id?.slice(-6).toUpperCase() || 'NEW'}</span>
+          {order.isUrgent ? (
+            <motion.div
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ repeat: Infinity, duration: 1.5 }}
+            >
+              <AlertTriangle className="w-4 h-4 text-white" />
+            </motion.div>
+          ) : (
+            <Hash className="w-4 h-4 opacity-70" />
+          )}
+          <span className="text-xs font-bold font-mono">
+            {order.isUrgent && "דחוף - "}
+            {order.id?.slice(-6).toUpperCase() || 'NEW'}
+          </span>
         </div>
-        <span className="text-xs font-medium bg-white/20 px-2 py-0.5 rounded uppercase">{order.status || 'pending'}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded uppercase">{order.status || 'pending'}</span>
+        </div>
       </div>
       
       <div className="p-4 space-y-4">
-        <div>
-          <h3 className="text-lg font-bold text-[#111b21] flex items-center gap-2">
-            <User className="w-5 h-5 text-[#00a884]" />
-            {customerName}
-          </h3>
-          {order.destination && (
-            <div className="flex items-start gap-2 text-sm text-gray-500 mt-1">
-              <MapPin className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-              <span>{order.destination}</span>
-            </div>
-          )}
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-[#111b21] flex items-center gap-2">
+              <User className="w-5 h-5 text-[#00a884]" />
+              {customerName}
+            </h3>
+            {order.destination && (
+              <div className="flex items-start gap-2 text-sm text-gray-500 mt-1">
+                <MapPin className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <span>{order.destination}</span>
+              </div>
+            )}
+          </div>
+          
+          <button 
+            onClick={toggleUrgent}
+            disabled={isUpdating}
+            className={cn(
+              "flex flex-col items-center gap-1 p-2 rounded-xl border transition-all active:scale-95",
+              order.isUrgent 
+                ? "bg-red-50 border-red-200 text-red-600" 
+                : "bg-gray-50 border-gray-100 text-gray-400 hover:border-red-100 hover:text-red-400"
+            )}
+          >
+            {isUpdating ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <AlertTriangle className={cn("w-5 h-5", order.isUrgent && "fill-red-600 text-white")} />
+            )}
+            <span className="text-[9px] font-bold uppercase tracking-tight">דחוף</span>
+          </button>
         </div>
 
         <div className="space-y-2">
@@ -122,6 +187,6 @@ export const DeepDiveCard: React.FC<DeepDiveCardProps> = ({ order }) => {
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 };

@@ -47,6 +47,7 @@ export interface Order {
   createdAt: Timestamp;
   updatedAt?: Timestamp;
   date?: string;
+  isUrgent?: boolean;
 }
 
 export interface StaffProfile {

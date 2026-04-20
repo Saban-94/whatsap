@@ -8,7 +8,8 @@ import {
   Package,
   MapPin,
   User as UserIcon,
-  History
+  History,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   collection, 
@@ -231,14 +232,19 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack
                 key={order.id} 
                 onClick={() => onOrderClick?.(order.id!)}
                 className={cn(
-                  "bg-white border rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-[#00a884]/30 transition-all cursor-pointer group active:scale-[0.98]",
+                  "bg-white border rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-[#00a884]/30 transition-all cursor-pointer group active:scale-[0.98] relative",
+                  order.isUrgent ? "border-red-300 bg-red-50/30" : "border-gray-200",
                   selectedOrderId === order.id ? "border-[#00a884] ring-2 ring-[#00a884]/10 bg-[#00a884]/5" : "border-gray-200"
                 )}
               >
+                {order.isUrgent && (
+                   <div className="absolute top-0 right-0 left-0 h-1 bg-red-500 rounded-t-2xl" />
+                )}
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <h3 className="font-bold text-[#111b21] group-hover:text-[#00a884] transition-colors">
+                    <h3 className="font-bold text-[#111b21] group-hover:text-[#00a884] transition-colors flex items-center gap-2">
                       {getCustomerDisplay(order)}
+                      {order.isUrgent && <AlertTriangle className="w-4 h-4 text-red-500 animate-pulse" />}
                     </h3>
                     <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-1">
                       <CalendarIcon className="w-3 h-3" />

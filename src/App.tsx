@@ -351,6 +351,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<'sidebar' | 'chat' | 'history' | 'warehouse' | 'staff' | 'notifSettings'>('sidebar');
   const [historyOrderId, setHistoryOrderId] = useState<string | null>(null);
   const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences | null>(null);
+  const notifiedUrgentOrders = useRef<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isFocused, setIsFocused] = useState(true);
@@ -519,6 +520,30 @@ export default function App() {
                 }
               }
             }
+          }
+        }
+
+        if (change.type === "modified") {
+          const order = change.doc.data() as Order;
+          const orderId = change.doc.id;
+          
+          if (order.isUrgent && !notifiedUrgentOrders.current.has(orderId)) {
+            notifiedUrgentOrders.current.add(orderId);
+            const customerDisplay = getCustomerDisplay(order);
+            
+            if ("Notification" in window && Notification.permission === "granted") {
+              new Notification("🚨 טיפול דחוף נדרש!", {
+                body: `הזמנה עבור ${customerDisplay} סומנה כדחופה עכשיו!`,
+                icon: "https://picsum.photos/seed/urgent/192/192",
+                requireInteraction: true
+              });
+              
+              if ("vibrate" in navigator) {
+                navigator.vibrate([500, 200, 500, 200, 500]);
+              }
+            }
+          } else if (!order.isUrgent) {
+            notifiedUrgentOrders.current.delete(orderId);
           }
         }
       });
