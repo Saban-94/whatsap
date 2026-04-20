@@ -102,6 +102,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe }) => {
   );
 };
 
+const StatusIndicator = ({ status }: { status?: 'online' | 'away' | 'offline' }) => {
+  if (!status) return null;
+  const colors = {
+    online: "bg-[#00a884]",
+    away: "bg-[#ffbc38]",
+    offline: "bg-[#8696a0]"
+  };
+  
+  return (
+    <div className={cn("w-2 h-2 rounded-full", colors[status])} title={status} />
+  );
+};
+
 interface HeaderProps {
   user: any;
   toggleSidebar: () => void;
@@ -409,7 +422,10 @@ export default function App() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center mb-0.5">
-                    <h3 className="text-sm font-medium text-[#111b21] truncate">נועה AI</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-medium text-[#111b21] truncate">נועה AI</h3>
+                      <StatusIndicator status="online" />
+                    </div>
                     <span className="text-[10px] text-gray-500">עכשיו</span>
                   </div>
                   <p className="text-xs text-gray-500 truncate">
@@ -426,7 +442,10 @@ export default function App() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center mb-0.5">
-                      <h3 className="text-sm font-medium text-[#111b21] truncate">איש קשר {i}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-medium text-[#111b21] truncate">איש קשר {i}</h3>
+                        <StatusIndicator status={i === 1 ? 'away' : i === 2 ? 'offline' : 'online'} />
+                      </div>
                       <span className="text-[10px] text-gray-500">12:45</span>
                     </div>
                     <p className="text-xs text-gray-500 truncate">הנחיות לוגיסטיות...</p>
