@@ -49,10 +49,12 @@ service cloud.firestore {
     // Message validation
     function isValidMessage(data) {
       return data.keys().hasAll(['senderId', 'text', 'status', 'createdAt', 'type']) &&
-             data.senderId == request.auth.uid &&
+             (data.senderId == request.auth.uid || data.senderId == 'noa') &&
              data.text is string && data.text.size() <= 4096 &&
              data.status in ['sent', 'read'] &&
              data.type in ['text', 'file'] &&
+             (!data.keys().hasAny(['fileName']) || (data.fileName is string && data.fileName.size() <= 256)) &&
+             (!data.keys().hasAny(['fileUrl']) || (data.fileUrl is string && data.fileUrl.size() <= 2048)) &&
              data.createdAt == request.time;
     }
 

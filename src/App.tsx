@@ -287,9 +287,7 @@ export default function App() {
     
     playTick();
 
-    // In a real app, you would upload to Firebase Storage here and get a URL.
-    // Since we want it to feel real, we'll simulate an upload.
-    const fileUrl = URL.createObjectURL(file); // Local preview URL
+    const fileUrl = URL.createObjectURL(file);
     
     const msgData = {
       text: `שלחתי קובץ: ${file.name}`,
@@ -303,7 +301,49 @@ export default function App() {
     };
 
     await addDoc(collection(db, 'chats', chatId, 'messages'), msgData);
-    handleAIResponse(`קיבלתי את הקובץ ${file.name}. מה תרצה שאעשה איתו?`);
+    
+    // Trigger AI Analysis instead of generic response
+    handleAIAnalysis(file);
+  };
+
+  const handleAIAnalysis = async (file: File) => {
+    if (!ai || !user) return;
+    setIsNoaTyping(true);
+    const chatId = `chat_${user.uid}_noa`;
+
+    try {
+      let analysisPrompt = `The user has uploaded a file named "${file.name}" (type: ${file.type || 'unknown'}). `;
+      
+      // If it's a small enough representative file or we want to simulate deep analysis:
+      // For now, we use a prompt that describes the context to Noa.
+      analysisPrompt += `Please provide a professional logistics summary of this file and suggest the next steps for the Saban team.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: analysisPrompt,
+        config: {
+          systemInstruction: NOA_SYSTEM_INSTRUCTION
+        }
+      });
+
+      const reply = response.text || "קלטתי את הקובץ, אבל אני צריכה עוד רגע לעבד אותו. מה התוכנית?";
+      
+      setTimeout(async () => {
+        await addDoc(collection(db, 'chats', chatId, 'messages'), {
+          text: reply,
+          senderId: 'noa',
+          senderName: 'Noa AI',
+          status: 'sent',
+          type: 'text',
+          createdAt: serverTimestamp()
+        });
+        setIsNoaTyping(false);
+      }, 2000);
+
+    } catch (error) {
+      console.error("Analysis Error:", error);
+      setIsNoaTyping(false);
+    }
   };
 
   const handleAIResponse = async (userText: string) => {
@@ -417,8 +457,8 @@ export default function App() {
 
             <div className="flex-1 overflow-y-auto">
               <div className="flex items-center px-4 py-3 gap-3 bg-[#f0f2f5] cursor-pointer hover:bg-gray-100 transition-colors border-b border-gray-100">
-                <div className="w-12 h-12 rounded-full bg-[#00a884] flex items-center justify-center text-white shrink-0">
-                  <User className="w-6 h-6" />
+                <div className="w-12 h-12 rounded-full bg-[#00a884] flex items-center justify-center text-white shrink-0 overflow-hidden">
+                  <img src="https://picsum.photos/seed/noa-ai/100" alt="Noa AI" referrerPolicy="no-referrer" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center mb-0.5">
@@ -438,7 +478,7 @@ export default function App() {
               {[1, 2, 3].map(i => (
                 <div key={i} className="flex items-center px-4 py-3 gap-3 cursor-pointer hover:bg-gray-50 transition-colors border-b border-white">
                   <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden shrink-0">
-                    <img src={`https://picsum.photos/seed/${i}/100`} alt="demo" referrerPolicy="no-referrer" />
+                    <img src={`https://picsum.photos/seed/user-${i}/100`} alt="demo" referrerPolicy="no-referrer" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center mb-0.5">
