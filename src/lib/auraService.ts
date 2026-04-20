@@ -1,12 +1,13 @@
 import { format } from 'date-fns';
-import { collection, query, where, getDocs, limit, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { 
   ai, 
   NOA_SYSTEM_INSTRUCTION, 
   searchOrdersTool, 
   getOrdersByDateTool, 
-  createOrderTool 
+  createOrderTool,
+  getOrderDetailsTool
 } from './ai';
 
 export const processNoaTurn = async (userText: string, user: any) => {
@@ -31,13 +32,15 @@ User Name: ${displayName}
 Message: ${userText}
 `;
 
+  const availableTools = [searchOrdersTool, getOrdersByDateTool, createOrderTool, getOrderDetailsTool];
+
   try {
     let response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         systemInstruction: NOA_SYSTEM_INSTRUCTION,
-        tools: [{ functionDeclarations: [searchOrdersTool, getOrdersByDateTool, createOrderTool] }]
+        tools: [{ functionDeclarations: availableTools }]
       }
     });
 
@@ -49,13 +52,11 @@ Message: ${userText}
           const cleanQuery = qStr?.trim();
           const cleanStatus = sStr?.trim();
           
-          // Strategy: Fetch all recent orders (or by status) and filter client-side for better matching (zabulon)
           let ordersRef = collection(db, 'orders');
           let q;
           if (cleanStatus) {
             q = query(ordersRef, where('status', '==', cleanStatus));
           } else {
-            // Fetch everything to ensure we find "preparing" etc
             q = query(ordersRef, limit(300));
           }
           
@@ -76,21 +77,56 @@ Message: ${userText}
           
           if (cleanQuery) {
             const lowerQuery = cleanQuery.toLowerCase();
-            results = results.filter((r: any) => 
-              (r.customerName && r.customerName.toLowerCase().includes(lowerQuery)) || 
-              (r.items && r.items.some((i: string) => i.toLowerCase().includes(lowerQuery))) ||
-              (r.destination && r.destination.toLowerCase().includes(lowerQuery))
-            );
+            // Slug-like comparison: take first word or clean string
+            const searchSlug = lowerQuery.split(/[\s\-/]/)[0]; 
+
+            results = results.filter((r: any) => {
+              const customerNameLower = (r.customerName || '').toLowerCase();
+              const destinationLower = (r.destination || '').toLowerCase();
+              const itemsStr = (r.items || []).join(' ').toLowerCase();
+
+              return customerNameLower.includes(lowerQuery) || 
+                     customerNameLower.includes(searchSlug) ||
+                     destinationLower.includes(lowerQuery) ||
+                     itemsStr.includes(lowerQuery);
+            });
           }
           
           console.log(`[Noa Debug] search_orders results for "${cleanQuery}":`, results.length);
           toolOutputs.push({ name: call.name, output: results, id: (call as any).id });
 
+        } else if (call.name === "get_order_details") {
+          const { orderId, customerName } = call.args as any;
+          let result = null;
+
+          if (orderId) {
+            const orderDoc = await getDoc(doc(db, 'orders', orderId));
+            if (orderDoc.exists()) {
+              result = { id: orderDoc.id, ...orderDoc.data() };
+            }
+          }
+
+          if (!result && customerName) {
+            // Fallback to fuzzy search by name to find the right doc
+            const lowerCName = customerName.toLowerCase();
+            const searchSlug = lowerCName.split(/[\s\-/]/)[0];
+            const snap = await getDocs(query(collection(db, 'orders'), limit(300)));
+            const match = snap.docs.find(d => {
+              const name = ((d.data() as any).customerName || (d.data() as any).customer || '').toLowerCase();
+              return name.includes(lowerCName) || name.includes(searchSlug);
+            });
+            if (match) {
+              result = { id: match.id, ...match.data() };
+            }
+          }
+
+          console.log(`[Noa Debug] get_order_details for "${orderId || customerName}":`, result ? "Found" : "Not Found");
+          toolOutputs.push({ name: call.name, output: result, id: (call as any).id });
+
         } else if (call.name === "get_orders_by_date") {
           const { startDate } = call.args as any;
           const searchDate = startDate || todayISO;
           
-          // Fetch everything to avoid missing 'preparing' status
           const snap = await getDocs(query(collection(db, 'orders'), limit(300)));
           const allOrders = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
           
@@ -138,12 +174,16 @@ Message: ${userText}
             parts: toolOutputs.map((o) => ({ 
               functionResponse: { 
                 name: o.name, 
-                response: { content: o.output } // Correct structure
+                response: { content: o.output },
+                id: o.id
               } 
             })) 
           }
         ],
-        config: { systemInstruction: NOA_SYSTEM_INSTRUCTION }
+        config: { 
+          systemInstruction: NOA_SYSTEM_INSTRUCTION,
+          tools: [{ functionDeclarations: availableTools }]
+        }
       });
     }
 
