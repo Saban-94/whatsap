@@ -598,7 +598,7 @@ export default function App() {
             
             // Add automatic Noa message to chat (WhatsApp Interface Simulation)
             await addDoc(collection(db, 'chats', chatId, 'messages'), {
-              text: `📢 [Saban Messenger - קבוצת נהגים]\n\n🚀 ראמי נשמה, נכנסה הזמנה חדשה בסידור!\n\n🔹 לקוח: ${order.customer}\n🔹 פריטים: ${order.items.join(', ')}\n🔹 יעד: ${order.destination || 'ממתין לעדכון'}\n\nהמערכת בודקת כרגע זמינות נהגים...`,
+              text: `📢 [Saban Messenger - קבוצת נהגים]\n\n🚀 ראמי נשמה, נכנסה הזמנה חדשה בסידור!\n\n🔹 לקוח: ${order.customer}\n🔹 פריטים: ${Array.isArray(order.items) ? order.items.join(', ') : (order.items || 'לא צוין')}\n🔹 יעד: ${order.destination || 'ממתין לעדכון'}\n\nהמערכת בודקת כרגע זמינות נהגים...`,
               senderId: 'noa',
               senderName: 'Saban Messenger',
               status: 'sent',

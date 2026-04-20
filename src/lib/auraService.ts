@@ -90,7 +90,9 @@ Message: ${userText}
             results = results.filter((r: any) => {
               const customerNameLower = (r.customerName || '').toLowerCase();
               const destinationLower = (r.destination || '').toLowerCase();
-              const itemsStr = (r.items || []).join(' ').toLowerCase();
+              const itemsStr = Array.isArray(r.items) 
+                ? r.items.join(' ').toLowerCase() 
+                : (typeof r.items === 'string' ? r.items.toLowerCase() : '');
 
               return customerNameLower.includes(lowerQuery) || 
                      customerNameLower.includes(searchSlug) ||
