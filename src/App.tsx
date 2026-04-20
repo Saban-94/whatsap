@@ -27,8 +27,7 @@ import {
   Eye,
   Maximize2,
   History, Warehouse, Users,
-  Calendar,
-  Bell
+  Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getCustomerDisplay, getItemsDisplay } from './lib/orderUtils';
@@ -59,9 +58,6 @@ import { DeepDiveCard } from './components/DeepDiveCard';
 import { NoaChat } from './components/NoaChat';
 import { WarehouseDashboard } from './components/WarehouseDashboard';
 import { StaffSettings } from './components/StaffSettings';
-import { NotificationSettings } from './components/NotificationSettings';
-import { getDoc } from 'firebase/firestore';
-import { NotificationPreferences } from './types';
 
 // --- Components ---
 
@@ -348,10 +344,8 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNoaTyping, setIsNoaTyping] = useState(false);
-  const [activeView, setActiveView] = useState<'sidebar' | 'chat' | 'history' | 'warehouse' | 'staff' | 'notifSettings'>('sidebar');
+  const [activeView, setActiveView] = useState<'sidebar' | 'chat' | 'history' | 'warehouse' | 'staff'>('sidebar');
   const [historyOrderId, setHistoryOrderId] = useState<string | null>(null);
-  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences | null>(null);
-  const notifiedUrgentOrders = useRef<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isFocused, setIsFocused] = useState(true);
@@ -370,7 +364,7 @@ export default function App() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleActiveViewChange = (view: 'sidebar' | 'chat' | 'history' | 'warehouse' | 'staff' | 'notifSettings') => {
+  const handleActiveViewChange = (view: 'sidebar' | 'chat' | 'history' | 'warehouse' | 'staff') => {
     if (isTransitioning) return;
     setIsTransitioning(true);
     setActiveView(view as any);
@@ -394,45 +388,6 @@ export default function App() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-
-  // Fetch Notification Preferences
-  useEffect(() => {
-    if (!user) return;
-    const fetchNotifs = async () => {
-      try {
-        const docRef = doc(db, 'user_settings', user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists() && docSnap.data().notifications) {
-          setNotificationPrefs(docSnap.data().notifications);
-        }
-      } catch (err) {
-        console.error("Error fetching notifs for push logic:", err);
-      }
-    };
-    fetchNotifs();
-    
-    // Also listen for changes to apply immediately
-    const unsub = onSnapshot(doc(db, 'user_settings', user.uid), (snap) => {
-      if (snap.exists() && snap.data().notifications) {
-        setNotificationPrefs(snap.data().notifications);
-      }
-    });
-    return () => unsub();
-  }, [user]);
-
-  const isDNDActive = () => {
-    if (!notificationPrefs?.dndEnabled) return false;
-    const now = new Date();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    const { dndStart, dndEnd } = notificationPrefs;
-    
-    if (dndStart <= dndEnd) {
-      return currentTime >= dndStart && currentTime <= dndEnd;
-    } else {
-      // Over midnight
-      return currentTime >= dndStart || currentTime <= dndEnd;
-    }
-  };
 
   // Orders Real-time Bridge & Notifications
   useEffect(() => {
@@ -499,51 +454,11 @@ export default function App() {
 
             // Native Push Notification Simulation
             if ("Notification" in window && Notification.permission === "granted") {
-              const prefs = notificationPrefs;
-              const shouldNotify = !prefs || (prefs.enabled && !isDNDActive());
-              
-              if (shouldNotify) {
-                new Notification("Saban Messenger (WhatsApp)", {
-                  body: `הזמנה חדשה מ-${customerDisplay} - ${order.destination || ''}`,
-                  icon: "https://picsum.photos/seed/sabanos/192/192",
-                  silent: prefs?.sound === 'none'
-                });
-                
-                // Sound simulation
-                if (prefs?.sound === 'chime') {
-                   // would play chime.mp3
-                }
-                
-                // Vibration simulation
-                if (prefs?.vibration && "vibrate" in navigator) {
-                  navigator.vibrate([200, 100, 200]);
-                }
-              }
-            }
-          }
-        }
-
-        if (change.type === "modified") {
-          const order = change.doc.data() as Order;
-          const orderId = change.doc.id;
-          
-          if (order.isUrgent && !notifiedUrgentOrders.current.has(orderId)) {
-            notifiedUrgentOrders.current.add(orderId);
-            const customerDisplay = getCustomerDisplay(order);
-            
-            if ("Notification" in window && Notification.permission === "granted") {
-              new Notification("🚨 טיפול דחוף נדרש!", {
-                body: `הזמנה עבור ${customerDisplay} סומנה כדחופה עכשיו!`,
-                icon: "https://picsum.photos/seed/urgent/192/192",
-                requireInteraction: true
+              new Notification("Saban Messenger (WhatsApp)", {
+                body: `הזמנה חדשה מ-${customerDisplay} - ${order.destination || ''}`,
+                icon: "https://picsum.photos/seed/sabanos/192/192"
               });
-              
-              if ("vibrate" in navigator) {
-                navigator.vibrate([500, 200, 500, 200, 500]);
-              }
             }
-          } else if (!order.isUrgent) {
-            notifiedUrgentOrders.current.delete(orderId);
           }
         }
       });
@@ -1046,32 +961,6 @@ export default function App() {
                 )} />
               </div>
 
-              <div 
-                onClick={() => handleActiveViewChange('notifSettings')}
-                className={cn(
-                  "flex items-center px-4 py-3 gap-3 cursor-pointer hover:bg-[#f0f2f5] transition-all border-b border-gray-100 group active:bg-gray-200",
-                  activeView === 'notifSettings' && "bg-[#f0f2f5] border-r-4 border-r-orange-500 shadow-inner"
-                )}
-              >
-                <div className={cn(
-                   "w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors shadow-sm",
-                   activeView === 'notifSettings' ? "bg-orange-500 text-white" : "bg-white text-orange-500 group-hover:bg-orange-500 group-hover:text-white border border-orange-100"
-                )}>
-                  <Bell className="w-6 h-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className={cn(
-                    "text-sm font-semibold truncate",
-                    activeView === 'notifSettings' ? "text-orange-600" : "text-[#111b21]"
-                  )}>התראות ושמע</h3>
-                  <p className="text-[11px] text-gray-400 truncate">צלילים, רטט ושעות שקט</p>
-                </div>
-                <ChevronLeft className={cn(
-                  "w-4 h-4 transition-all opacity-0 group-hover:opacity-100",
-                  activeView === 'notifSettings' ? "text-orange-500 opacity-100" : "text-gray-300"
-                )} />
-              </div>
-
               <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 italic text-[10px] text-gray-400 font-bold tracking-widest uppercase shrink-0">
                  צוותים פעילים
               </div>
@@ -1131,7 +1020,7 @@ export default function App() {
 
       {/* Main Area */}
       <AnimatePresence mode="wait">
-        {(!isMobile || activeView === 'chat' || activeView === 'history' || activeView === 'warehouse' || activeView === 'notifSettings') && (
+        {(!isMobile || activeView === 'chat' || activeView === 'history' || activeView === 'warehouse') && (
           <motion.div 
             key={activeView}
             initial={isMobile ? { x: "-100%" } : { opacity: 0 }}
@@ -1149,11 +1038,6 @@ export default function App() {
               <WarehouseDashboard onBack={() => handleActiveViewChange(isMobile ? 'sidebar' : 'chat')} />
             ) : activeView === 'staff' ? (
               <StaffSettings onBack={() => handleActiveViewChange(isMobile ? 'sidebar' : 'chat')} />
-            ) : activeView === 'notifSettings' ? (
-              <NotificationSettings 
-                userId={user.uid} 
-                onBack={() => handleActiveViewChange(isMobile ? 'sidebar' : 'chat')} 
-              />
             ) : (
               <>
                 <Header 

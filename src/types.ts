@@ -47,7 +47,6 @@ export interface Order {
   createdAt: Timestamp;
   updatedAt?: Timestamp;
   date?: string;
-  isUrgent?: boolean;
 }
 
 export interface StaffProfile {
@@ -59,13 +58,4 @@ export interface StaffProfile {
   introductionRules: string;
   calendarEnabled: boolean;
   updatedAt?: Timestamp;
-}
-
-export interface NotificationPreferences {
-  enabled: boolean;
-  sound: 'default' | 'chime' | 'none';
-  vibration: boolean;
-  dndEnabled: boolean;
-  dndStart: string; // "HH:mm"
-  dndEnd: string;   // "HH:mm"
 }
