@@ -63,16 +63,24 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe }) => {
         )}
       >
         {message.type === 'file' ? (
-          <div className="flex items-center gap-3 p-3 bg-black/5 rounded-md mb-1 border border-gray-100">
+          <a 
+            href={message.fileUrl} 
+            download={message.fileName} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 bg-black/5 rounded-md mb-1 border border-gray-100 hover:bg-black/10 transition-colors cursor-pointer"
+          >
             <div className="bg-[#00a884] p-3 rounded text-white">
               <FileText className="w-6 h-6" />
             </div>
             <div className="flex-1 min-w-0 mx-3">
-              <p className="text-sm font-medium truncate">{message.fileName || 'document.pdf'}</p>
-              <p className="text-[10px] text-gray-500 uppercase">Excel • 24 KB</p>
+              <p className="text-sm font-medium truncate">{message.fileName || 'קובץ'}</p>
+              <p className="text-[10px] text-gray-500 uppercase">
+                {message.fileName?.split('.').pop()?.toUpperCase() || 'FILE'}
+              </p>
             </div>
-            <Download className="w-6 h-6 text-[#8696a0] cursor-pointer" />
-          </div>
+            <Download className="w-6 h-6 text-[#8696a0]" />
+          </a>
         ) : (
           <p className="text-[14.2px] text-[#111b21] whitespace-pre-wrap leading-normal">{message.text}</p>
         )}
@@ -128,11 +136,13 @@ const Header: React.FC<HeaderProps> = ({ user, toggleSidebar, isSidebarOpen }) =
 
 interface InputAreaProps {
   onSendMessage: (msg: string) => void;
+  onSendFile: (file: File) => void;
   isTyping: boolean;
 }
 
-const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, isTyping }) => {
+const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onSendFile, isTyping }) => {
   const [text, setText] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSend = () => {
     if (!text.trim()) return;
@@ -140,11 +150,28 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, isTyping }) => {
     setText('');
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      onSendFile(file);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="bg-[#f0f2f5] min-h-[62px] py-2 px-3 flex items-center gap-3 sticky bottom-0 z-10 border-t border-gray-300">
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        className="hidden" 
+        onChange={handleFileChange}
+      />
       <div className="flex gap-3 text-[#54656f]">
         <Smile className="w-6 h-6 cursor-pointer" />
-        <Paperclip className="w-6 h-6 cursor-pointer" />
+        <Paperclip 
+          className="w-6 h-6 cursor-pointer" 
+          onClick={() => fileInputRef.current?.click()}
+        />
       </div>
       <div className="flex-1 relative">
         <input 
@@ -239,6 +266,31 @@ export default function App() {
     
     // AI Response logic
     handleAIResponse(text);
+  };
+
+  const handleSendFile = async (file: File) => {
+    if (!user) return;
+    const chatId = `chat_${user.uid}_noa`;
+    
+    playTick();
+
+    // In a real app, you would upload to Firebase Storage here and get a URL.
+    // Since we want it to feel real, we'll simulate an upload.
+    const fileUrl = URL.createObjectURL(file); // Local preview URL
+    
+    const msgData = {
+      text: `שלחתי קובץ: ${file.name}`,
+      senderId: user.uid,
+      senderName: user.displayName || 'User',
+      status: 'sent',
+      type: 'file',
+      fileName: file.name,
+      fileUrl: fileUrl,
+      createdAt: serverTimestamp()
+    };
+
+    await addDoc(collection(db, 'chats', chatId, 'messages'), msgData);
+    handleAIResponse(`קיבלתי את הקובץ ${file.name}. מה תרצה שאעשה איתו?`);
   };
 
   const handleAIResponse = async (userText: string) => {
@@ -419,7 +471,7 @@ export default function App() {
           <div ref={messagesEndRef} />
         </div>
 
-        <InputArea onSendMessage={handleSendMessage} isTyping={isNoaTyping} />
+        <InputArea onSendMessage={handleSendMessage} onSendFile={handleSendFile} isTyping={isNoaTyping} />
       </div>
 
       <style>{`
