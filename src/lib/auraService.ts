@@ -7,7 +7,8 @@ import {
   searchOrdersTool, 
   getOrdersByDateTool, 
   createOrderTool,
-  getOrderDetailsTool
+  getOrderDetailsTool,
+  driverReportTool
 } from './ai';
 
 export const processNoaTurn = async (userText: string, user: any) => {
@@ -32,7 +33,13 @@ Current User: ${displayName}
 Message: ${userText}
 `;
 
-  const availableTools = [searchOrdersTool, getOrdersByDateTool, createOrderTool, getOrderDetailsTool];
+  const availableTools = [
+    searchOrdersTool, 
+    getOrdersByDateTool, 
+    createOrderTool, 
+    getOrderDetailsTool,
+    driverReportTool
+  ];
 
   try {
     let response = await ai.models.generateContent({
@@ -160,6 +167,17 @@ Message: ${userText}
             date: todayISO
           });
           toolOutputs.push({ name: call.name, output: { success: true, orderId: docRef.id }, id: (call as any).id });
+        } else if (call.name === "driver_report") {
+          const { driverName, truckNumber, kilometers, notes } = call.args as any;
+          const docRef = await addDoc(collection(db, 'driver_reports'), {
+            driverName,
+            truckNumber,
+            kilometers,
+            notes,
+            reportDate: todayISO,
+            createdAt: serverTimestamp()
+          });
+          toolOutputs.push({ name: call.name, output: { success: true, reportId: docRef.id }, id: (call as any).id });
         }
       }
 

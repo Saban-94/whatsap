@@ -596,11 +596,11 @@ export default function App() {
           if (now - orderTime < 30000 && order.createdBy !== 'noa') {
             const chatId = `chat_${user.uid}_noa`;
             
-            // Add automatic Noa message to chat
+            // Add automatic Noa message to chat (WhatsApp Interface Simulation)
             await addDoc(collection(db, 'chats', chatId, 'messages'), {
-              text: `🚀 ראמי נשמה, נכנסה הזמנה חדשה בסידור! \nלקוח: ${order.customer}\nפריטים: ${order.items.join(', ')}\nמצב הסידור כרגע מתעדכן...`,
+              text: `📢 [Saban Messenger - קבוצת נהגים]\n\n🚀 ראמי נשמה, נכנסה הזמנה חדשה בסידור!\n\n🔹 לקוח: ${order.customer}\n🔹 פריטים: ${order.items.join(', ')}\n🔹 יעד: ${order.destination || 'ממתין לעדכון'}\n\nהמערכת בודקת כרגע זמינות נהגים...`,
               senderId: 'noa',
-              senderName: 'Noa AI',
+              senderName: 'Saban Messenger',
               status: 'sent',
               type: 'text',
               createdAt: serverTimestamp()
@@ -608,8 +608,8 @@ export default function App() {
 
             // Native Push Notification Simulation
             if ("Notification" in window && Notification.permission === "granted") {
-              new Notification("SabanOS: הזמנה חדשה", {
-                body: `נכנסה הזמנה מ-${order.customer}`,
+              new Notification("Saban Messenger (WhatsApp)", {
+                body: `הזמנה חדשה מ-${order.customer} - ${order.destination || ''}`,
                 icon: "https://picsum.photos/seed/sabanos/192/192"
               });
             }
