@@ -55,6 +55,7 @@ service cloud.firestore {
              data.type in ['text', 'file', 'audio'] &&
              (!data.keys().hasAny(['fileName']) || (data.fileName is string && data.fileName.size() <= 256)) &&
              (!data.keys().hasAny(['fileUrl']) || (data.fileUrl is string && data.fileUrl.size() <= 2048)) &&
+             (!data.keys().hasAny(['fileContent']) || (data.fileContent is string && data.fileContent.size() <= 100000)) &&
              (!data.keys().hasAny(['duration']) || (data.duration is number || data.duration is int)) &&
              data.createdAt == request.time;
     }

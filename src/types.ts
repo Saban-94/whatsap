@@ -25,6 +25,7 @@ export interface Message {
   type: 'text' | 'file' | 'audio';
   fileUrl?: string;
   fileName?: string;
+  fileContent?: string; // For text file previews
   duration?: number;
   reactions?: Record<string, string[]>; // emoji -> list of userIds
   createdAt: Timestamp;

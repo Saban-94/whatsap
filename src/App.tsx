@@ -23,7 +23,9 @@ import {
   ArrowRight,
   ChevronLeft,
   Settings,
-  LayoutGrid
+  LayoutGrid,
+  Eye,
+  Maximize2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -103,7 +105,12 @@ interface MessageBubbleProps {
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, onReact }) => {
   const [showReactions, setShowReactions] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const emojis = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+  const isPDF = message.fileName?.toLowerCase().endsWith('.pdf');
+  const isImage = message.fileName?.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/);
+  const hasContent = !!message.fileContent;
 
   return (
     <motion.div
@@ -123,24 +130,63 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, onReact })
           )}
         >
           {message.type === 'file' ? (
-            <a 
-              href={message.fileUrl} 
-              download={message.fileName} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 p-3 bg-black/5 rounded-md mb-1 border border-gray-100 hover:bg-black/10 transition-colors cursor-pointer"
-            >
-              <div className="bg-[#00a884] p-3 rounded text-white">
-                <FileText className="w-6 h-6" />
-              </div>
-              <div className="flex-1 min-w-0 mx-3">
-                <p className="text-sm font-medium truncate">{message.fileName || 'קובץ'}</p>
-                <p className="text-[10px] text-gray-500 uppercase">
-                  {message.fileName?.split('.').pop()?.toUpperCase() || 'FILE'}
-                </p>
-              </div>
-              <Download className="w-6 h-6 text-[#8696a0]" />
-            </a>
+            <div className="flex flex-col gap-2">
+              <a 
+                href={message.fileUrl} 
+                download={message.fileName} 
+                className="flex items-center gap-3 p-3 bg-black/5 rounded-md border border-gray-100 hover:bg-black/10 transition-colors cursor-pointer"
+              >
+                <div className="bg-[#00a884] p-3 rounded text-white shrink-0">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div className="flex-1 min-w-0 mx-3">
+                  <p className="text-sm font-medium truncate">{message.fileName || 'קובץ'}</p>
+                  <p className="text-[10px] text-gray-500 uppercase">
+                    {message.fileName?.split('.').pop()?.toUpperCase() || 'FILE'}
+                  </p>
+                </div>
+                <Download className="w-5 h-5 text-[#8696a0]" />
+              </a>
+
+              {(isPDF || isImage || hasContent) && (
+                <button 
+                  onClick={() => setIsPreviewOpen(!isPreviewOpen)}
+                  className="w-full flex items-center justify-center gap-2 py-1.5 text-xs text-[#00a884] font-medium border border-[#00a884]/20 rounded bg-[#00a884]/5 hover:bg-[#00a884]/10 transition-colors"
+                >
+                  <Eye className="w-4 h-4" />
+                  {isPreviewOpen ? 'סגור תצוגה' : 'פתח תצוגה מהירה'}
+                </button>
+              )}
+
+              <AnimatePresence>
+                {isPreviewOpen && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-2 rounded border border-gray-200 bg-gray-50 overflow-hidden max-h-[300px] flex flex-col">
+                      {isImage ? (
+                        <img src={message.fileUrl} alt="preview" className="w-full object-contain" referrerPolicy="no-referrer" />
+                      ) : isPDF ? (
+                        <iframe src={message.fileUrl} className="w-full h-[250px] border-none" title="PDF Preview" />
+                      ) : hasContent ? (
+                        <div className="p-3 text-xs font-mono whitespace-pre-wrap break-words overflow-y-auto custom-scrollbar bg-white text-gray-700">
+                          {message.fileContent}
+                        </div>
+                      ) : null}
+                      <div className="p-2 flex justify-between items-center bg-gray-100 border-t border-gray-200 shrink-0">
+                        <span className="text-[10px] text-gray-500">{message.fileName}</span>
+                        <a href={message.fileUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#00a884] hover:underline flex items-center gap-1">
+                          <Maximize2 className="w-3 h-3" /> מסך מלא
+                        </a>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           ) : message.type === 'audio' ? (
             <AudioPlayer url={message.fileUrl} duration={message.duration} />
           ) : (
@@ -522,6 +568,16 @@ export default function App() {
     playTick();
 
     const fileUrl = URL.createObjectURL(file);
+    let fileContent = '';
+
+    // Read text file content for preview
+    if (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.csv') || file.name.endsWith('.json')) {
+      try {
+        fileContent = await file.text();
+      } catch (err) {
+        console.error("Failed to read file", err);
+      }
+    }
     
     const msgData = {
       text: `שלחתי קובץ: ${file.name}`,
@@ -531,6 +587,7 @@ export default function App() {
       type: 'file',
       fileName: file.name,
       fileUrl: fileUrl,
+      fileContent: fileContent,
       createdAt: serverTimestamp()
     };
 
