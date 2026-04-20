@@ -102,7 +102,7 @@ Message: ${userText}
           }
           
           console.log(`[Noa Debug] search_orders results for "${cleanQuery}":`, results.length);
-          toolOutputs.push({ name: call.name, output: results, id: (call as any).id });
+          toolOutputs.push({ name: call.name, output: { content: JSON.stringify(results) }, id: (call as any).id });
 
         } else if (call.name === "get_order_details") {
           const { orderId, customerName } = call.args as any;
@@ -130,7 +130,7 @@ Message: ${userText}
           }
 
           console.log(`[Noa Debug] get_order_details for "${orderId || customerName}":`, result ? "Found" : "Not Found");
-          toolOutputs.push({ name: call.name, output: result, id: (call as any).id });
+          toolOutputs.push({ name: call.name, output: { content: JSON.stringify(result) }, id: (call as any).id });
 
         } else if (call.name === "get_orders_by_date") {
           const { startDate } = call.args as any;
@@ -156,7 +156,7 @@ Message: ${userText}
           }));
 
           console.log(`[Noa Debug] get_orders_by_date results for "${searchDate}":`, results.length);
-          toolOutputs.push({ name: call.name, output: results, id: (call as any).id });
+          toolOutputs.push({ name: call.name, output: { content: JSON.stringify(results) }, id: (call as any).id });
 
         } else if (call.name === "create_order") {
           const { customer, items } = call.args as any;
@@ -168,7 +168,7 @@ Message: ${userText}
             createdAt: serverTimestamp(),
             date: todayISO
           });
-          toolOutputs.push({ name: call.name, output: { success: true, orderId: docRef.id }, id: (call as any).id });
+          toolOutputs.push({ name: call.name, output: { content: JSON.stringify({ success: true, orderId: docRef.id }) }, id: (call as any).id });
         } else if (call.name === "driver_report") {
           const { driverName, truckNumber, kilometers, notes } = call.args as any;
           const docRef = await addDoc(collection(db, 'driver_reports'), {
@@ -179,7 +179,7 @@ Message: ${userText}
             reportDate: todayISO,
             createdAt: serverTimestamp()
           });
-          toolOutputs.push({ name: call.name, output: { success: true, reportId: docRef.id }, id: (call as any).id });
+          toolOutputs.push({ name: call.name, output: { content: JSON.stringify({ success: true, reportId: docRef.id }) }, id: (call as any).id });
         }
       }
 
@@ -194,7 +194,7 @@ Message: ${userText}
             parts: toolOutputs.map((o) => ({ 
               functionResponse: { 
                 name: o.name, 
-                response: { content: o.output },
+                response: o.output,
                 id: o.id
               } 
             })) 

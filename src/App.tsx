@@ -621,9 +621,14 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
   
-  // Sound effect
+  // Sound effects
   const playTick = () => {
     const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+    audio.play().catch(() => {});
+  };
+
+  const playAICompletion = () => {
+    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
     audio.play().catch(() => {});
   };
 
@@ -792,6 +797,7 @@ export default function App() {
           type: 'text',
           createdAt: serverTimestamp()
         });
+        playAICompletion();
         setIsNoaTyping(false);
       }, 2000);
 
@@ -832,6 +838,7 @@ export default function App() {
           type: 'text',
           createdAt: serverTimestamp()
         });
+        playAICompletion();
         setIsNoaTyping(false);
       }, 500); // Shorter delay as service already has its own processing time
 
