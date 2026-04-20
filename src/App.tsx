@@ -30,6 +30,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getCustomerDisplay, getItemsDisplay } from './lib/orderUtils';
 import { 
   collection, 
   query, 
@@ -412,22 +413,23 @@ export default function App() {
           
           if (now - orderTime < 30000 && order.createdBy !== 'noa') {
             const chatId = `chat_${user.uid}_noa`;
-            const customerDisplay = order.customerName || order.customer || 'לקוח לא ידוע';
+            const customerDisplay = getCustomerDisplay(order);
+            const itemsDisplay = getItemsDisplay(order.items);
             
             // Check for Itzik's profile to personalize
-            let noaMessage = `📢 [Saban Messenger - קבוצת נהגים]\n\n🚀 ראמי נשמה, נכנסה הזמנה חדשה בסידור!\n\n🔹 לקוח: ${customerDisplay}\n🔹 פריטים: ${Array.isArray(order.items) ? order.items.join(', ') : (order.items || 'לא צוין')}\n🔹 יעד: ${order.destination || 'ממתין לעדכון'}\n\nהמערכת בודקת כרגע זמינות נהגים...`;
+            let noaMessage = `📢 [Saban Messenger - קבוצת נהגים]\n\n🚀 ראמי נשמה, נכנסה הזמנה חדשה בסידור!\n\n🔹 לקוח: ${customerDisplay}\n🔹 פריטים: ${itemsDisplay}\n🔹 יעד: ${order.destination || 'ממתין לעדכון'}\n\nהמערכת בודקת כרגע זמינות נהגים...`;
             
             try {
               const profileSnap = await getDocs(query(collection(db, 'profiles'), where('email', '==', user.email)));
               if (!profileSnap.empty) {
                 const profile = profileSnap.docs[0].data();
                 if (profile.name.includes('איציק')) {
-                  noaMessage = `איציק, רשמתי לך ביומן להכין את הציוד ל${customerDisplay} (${order.items || ''}) לשעה הקרובה.`;
+                  noaMessage = `איציק, רשמתי לך ביומן להכין את הציוד ל${customerDisplay} (${itemsDisplay}) לשעה הקרובה.`;
                   
                   // Auto-create calendar event in reminders as well
                   await addDoc(collection(db, 'reminders'), {
                     summary: `הכנת ציוד: ${customerDisplay}`,
-                    description: `פריטים: ${order.items || ''}`,
+                    description: `פריטים: ${itemsDisplay}`,
                     startTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
                     userEmail: user.email,
                     status: 'pending',

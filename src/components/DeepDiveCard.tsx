@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckSquare, Package, MapPin, User, Hash } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { getCustomerDisplay } from '../lib/orderUtils';
 
 interface DeepDiveCardProps {
   order: {
@@ -16,7 +17,7 @@ interface DeepDiveCardProps {
 }
 
 export const DeepDiveCard: React.FC<DeepDiveCardProps> = ({ order }) => {
-  const customerName = order.customerName || order.customer || 'לקוח לא ידוע';
+  const customerName = getCustomerDisplay(order as any);
   
   // Logic to parse items string as requested by the user
   const parseItems = (itemsInput: string | string[]) => {

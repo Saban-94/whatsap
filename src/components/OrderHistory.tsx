@@ -20,6 +20,7 @@ import {
 import { db } from '../lib/firebase';
 import { Order } from '../types';
 import { cn } from '../lib/utils';
+import { getCustomerDisplay, getItemsDisplay } from '../lib/orderUtils';
 import { format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { DayPicker, DateRange } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
@@ -87,7 +88,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack
   };
 
   const filteredOrders = orders.filter(order => {
-    const customer = (order.customerName || order.customer || '').toLowerCase();
+    const customer = getCustomerDisplay(order).toLowerCase();
     const destination = (order.destination || '').toLowerCase();
     const orderId = (order.id || '').toLowerCase();
     const term = searchTerm.toLowerCase();
@@ -237,7 +238,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="font-bold text-[#111b21] group-hover:text-[#00a884] transition-colors">
-                      {order.customerName || order.customer || 'לקוח ללא שם'}
+                      {getCustomerDisplay(order)}
                     </h3>
                     <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-1">
                       <CalendarIcon className="w-3 h-3" />
@@ -256,7 +257,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack
                   <div className="flex items-start gap-2 text-[13px] text-gray-600 px-0.5">
                     <Package className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                     <span className="line-clamp-1 italic text-gray-500">
-                      {Array.isArray(order.items) ? order.items.join(', ') : order.items}
+                      {getItemsDisplay(order.items)}
                     </span>
                   </div>
 

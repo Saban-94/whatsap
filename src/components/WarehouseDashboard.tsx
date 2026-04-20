@@ -23,6 +23,7 @@ import {
 import { db } from '../lib/firebase';
 import { Order } from '../types';
 import { cn } from '../lib/utils';
+import { getCustomerDisplay } from '../lib/orderUtils';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface WarehouseDashboardProps {
@@ -152,7 +153,7 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = ({ onBack }
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-[#111b21] truncate">
-                        {order.customerName || order.customer || 'לקוח ללא שם'}
+                        {getCustomerDisplay(order)}
                       </h3>
                       <div className="flex items-center gap-1.5 text-[11px] text-gray-400 mt-0.5">
                         <Clock className="w-3 h-3" />
