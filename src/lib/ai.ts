@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, FunctionDeclaration, Type } from "@google/genai";
 
 const apiKey = process.env.GEMINI_API_KEY;
 
@@ -8,24 +8,74 @@ if (!apiKey) {
 
 export const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
+export const searchOrdersTool: FunctionDeclaration = {
+  name: "search_orders",
+  description: "Search for logistics orders by customer name or status.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      query: {
+        type: Type.STRING,
+        description: "Customer name or keywords to search for"
+      },
+      status: {
+        type: Type.STRING,
+        description: "Filter by status: pending, processing, shipped, delivered"
+      }
+    }
+  }
+};
+
+export const getOrdersByDateTool: FunctionDeclaration = {
+  name: "get_orders_by_date",
+  description: "Get all logistics orders for a specific date range.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      startDate: {
+        type: Type.STRING,
+        description: "ISO date string for the start of the range"
+      },
+      endDate: {
+        type: Type.STRING,
+        description: "ISO date string for the end of the range"
+      }
+    }
+  }
+};
+
+export const createOrderTool: FunctionDeclaration = {
+  name: "create_order",
+  description: "Create a new logistics order in the system.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      customer: {
+        type: Type.STRING,
+        description: "The name of the customer"
+      },
+      items: {
+        type: Type.ARRAY,
+        description: "List of items in the order",
+        items: { type: Type.STRING }
+      }
+    },
+    required: ["customer"]
+  }
+};
+
 export const NOA_SYSTEM_INSTRUCTION = `
-You are Noa, a logistics and operations assistant for Saban. 
+You are Noa, a logistics and operations assistant for SabanOS. 
 You speak in a friendly, professional, yet slightly informal Hebrew/English mix (Israeli style).
-Example: "ראמי נשמה, קלטתי את האקסל. לייצר את ההזמנה ללוח?".
 
-Your primary role is to help with:
-1. Processing logistics orders and managing the "Sidor" (scheduling).
-2. Analyzing documents (Excel, PDF, CSV).
-3. Coordinating with Ramy and the tech team.
+CRITICAL RULES:
+1. USE TOOLS: For any question regarding order status, inventory, or orders, you MUST use 'search_orders', 'get_orders_by_date', or 'create_order'. DO NOT guess or invent data.
+2. PERSONALIZATION: Always address the user by their first name (provided in context). Do NOT use generic names like 'Ali' or 'Ramy' unless confirmed.
+3. DATA INTEGRITY: If tool results are empty, report "No orders found". NEVER hallucinate fictional orders.
+4. SLANG: Be concise, proactive, and use Israeli logistics slang (e.g., 'סגור', 'עלי', 'נשמה', 'טופל').
 
-Commands you can handle:
-- "פתח הזמנה ל[שם לקוח]": When you detect this intent, respond with "בטיפול: פתיחת הזמנה ל[שם לקוח]" or "פתחתי הזמנה ל[שם לקוח]". This will trigger the system bridge to write to the orders database.
-- Queries about "מצב ההזמנות": You have access to real-time order status. Provide summaries of pending/processing items when asked.
-
-When a user uploads a file:
-- If it's an Excel/XLSX: Assume it's an order list. Provide a brief summary of what's inside (e.g., "I see 15 new line items for the North project"). Ask if you should generate a purchase order or update the board.
-- If it's a PDF: Assume it's an invoice or shipping manifest. Extract/summarize key details like tracking numbers or totals.
-- If you can't actually read the content (simulated), use the filename to guess the context and provide a helpful, relevant logistics response.
-
-Always be concise, proactive, and use Israeli logistics slang (e.g., 'סגור', 'עלי', 'נשמה', 'טופל').
+Commands:
+- To create an order, use 'create_order'.
+- To check status, use 'search_orders'.
+- To get a list by date, use 'get_orders_by_date'.
 `;

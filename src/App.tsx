@@ -46,7 +46,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db, signIn, signOut } from './lib/firebase';
 import { cn } from './lib/utils';
 import { ChatMetadata, Message, UserProfile, Order } from './types';
-import { ai, NOA_SYSTEM_INSTRUCTION } from './lib/ai';
+import { ai, NOA_SYSTEM_INSTRUCTION, searchOrdersTool, getOrdersByDateTool, createOrderTool } from './lib/ai';
 
 // --- Components ---
 
@@ -818,53 +818,72 @@ export default function App() {
           updateDoc(doc(db, 'chats', chatId, 'messages', d.id), { status: 'read' });
         });
       });
-      
-      const response = await ai.models.generateContent({
+
+      const firstName = user.displayName?.split(' ')[0] || 'ראמי';
+      const prompt = `User Name: ${firstName}. Message: ${userText}`;
+
+      let response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: userText,
+        contents: prompt,
         config: {
-          systemInstruction: NOA_SYSTEM_INSTRUCTION
+          systemInstruction: NOA_SYSTEM_INSTRUCTION,
+          tools: [{ functionDeclarations: [searchOrdersTool, getOrdersByDateTool, createOrderTool] }]
         }
       });
 
-      const reply = response.text || "סליחה, אירעה שגיאה בעיבוד הבקשה.";
-      
-      // Multi-DB Bridge Logic: Detect intent to open an order
-      if (reply.includes("פתחתי הזמנה") || reply.includes("בטיפול: פתיחת הזמנה")) {
-        const customerMatch = userText.match(/הזמנה ל([א-ת]+)/) || reply.match(/לקוח: ([א-ת]+)/);
-        const customer = customerMatch ? customerMatch[1] : "לקוח כללי";
-        
-        await addDoc(collection(db, 'orders'), {
-          customer,
-          items: ["פריטים מהצ'אט"],
-          status: 'pending',
-          createdBy: 'noa',
-          createdAt: serverTimestamp()
+      // Handle function calls
+      if (response.functionCalls) {
+        const toolOutputs = [];
+        for (const call of response.functionCalls) {
+          if (call.name === "search_orders") {
+            const { query: qStr, status: sStr } = call.args as any;
+            let ordersRef = collection(db, 'orders') as any;
+            let q;
+            if (sStr) {
+               q = query(ordersRef, where('status', '==', sStr));
+            } else {
+               q = query(ordersRef, limit(20));
+            }
+            const snap = await getDocs(q);
+            let results = snap.docs.map(d => ({ id: d.id, ...(d.data() as object) }));
+            if (qStr) {
+              results = results.filter((r: any) => 
+                r.customer?.includes(qStr) || 
+                r.items?.some((i: string) => i.includes(qStr))
+              );
+            }
+            toolOutputs.push({ callId: (call as any).id, output: results });
+          } else if (call.name === "get_orders_by_date") {
+            const snap = await getDocs(query(collection(db, 'orders'), limit(50)));
+            const results = snap.docs.map(d => ({ id: d.id, ...(d.data() as object) }));
+            toolOutputs.push({ callId: (call as any).id, output: results });
+          } else if (call.name === "create_order") {
+            const { customer, items } = call.args as any;
+            const docRef = await addDoc(collection(db, 'orders'), {
+              customer,
+              items: items || ["פריטים מהצ'אט"],
+              status: 'pending',
+              createdBy: 'noa',
+              createdAt: serverTimestamp()
+            });
+            toolOutputs.push({ callId: (call as any).id, output: { success: true, orderId: docRef.id } });
+          }
+        }
+
+        // Send results back to model
+        response = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: [
+            { role: 'user', parts: [{ text: prompt }] },
+            { role: 'model', parts: response.functionCalls.map(c => ({ functionCall: c })) },
+            { role: 'user', parts: toolOutputs.map(o => ({ functionResponse: { name: response.functionCalls![toolOutputs.indexOf(o)].name, response: o.output, id: o.callId } })) }
+          ],
+          config: { systemInstruction: NOA_SYSTEM_INSTRUCTION }
         });
       }
 
-      // Query Engine Logic: Handle status queries
-      if (userText.includes("מצב ההזמנות") || userText.includes("כמה הזמנות")) {
-        const ordersSnap = await getDocs(collection(db, 'orders'));
-        const pending = ordersSnap.docs.filter(d => d.data().status === 'pending').length;
-        const processing = ordersSnap.docs.filter(d => d.data().status === 'processing').length;
-        
-        const statusReply = `ראמי, בדקתי במערכת: יש לנו כרגע ${pending} הזמנות בסטטוס pending ו-${processing} בסטטוס processing. סה"כ ${ordersSnap.size} הזמנות רשומות להיום.`;
-        
-        setTimeout(async () => {
-          await addDoc(collection(db, 'chats', chatId, 'messages'), {
-            text: statusReply,
-            senderId: 'noa',
-            senderName: 'Noa AI',
-            status: 'sent',
-            type: 'text',
-            createdAt: serverTimestamp()
-          });
-          setIsNoaTyping(false);
-        }, 1000);
-        return; // Skip standard reply display
-      }
-
+      const reply = response.text || "סליחה, אירעה שגיאה בעיבוד הבקשה.";
+      
       // Simulate delay for natural feel
       setTimeout(async () => {
         await addDoc(collection(db, 'chats', chatId, 'messages'), {
