@@ -25,7 +25,9 @@ import {
   Settings,
   LayoutGrid,
   Eye,
-  Maximize2
+  Maximize2,
+  History,
+  Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -50,6 +52,7 @@ import { ai, NOA_SYSTEM_INSTRUCTION } from './lib/ai';
 import { processNoaTurn } from './lib/auraService';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { OrderHistory } from './components/OrderHistory';
 
 // --- Components ---
 
@@ -552,12 +555,12 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNoaTyping, setIsNoaTyping] = useState(false);
-  const [activeView, setActiveView] = useState<'sidebar' | 'chat'>('sidebar');
+  const [activeView, setActiveView] = useState<'sidebar' | 'chat' | 'history'>('sidebar');
   const [isMobile, setIsMobile] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleActiveViewChange = (view: 'sidebar' | 'chat') => {
+  const handleActiveViewChange = (view: 'sidebar' | 'chat' | 'history') => {
     if (isTransitioning) return;
     setIsTransitioning(true);
     setActiveView(view);
@@ -917,8 +920,11 @@ export default function App() {
 
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               <div 
-                onClick={() => isMobile && handleActiveViewChange('chat')}
-                className="flex items-center px-4 py-3 gap-3 bg-[#f0f2f5] cursor-pointer hover:bg-white transition-colors border-b border-gray-100 active:bg-gray-200"
+                onClick={() => handleActiveViewChange('chat')}
+                className={cn(
+                  "flex items-center px-4 py-3 gap-3 cursor-pointer hover:bg-white transition-colors border-b border-gray-100 active:bg-gray-200",
+                  activeView === 'chat' ? "bg-[#f0f2f5]" : "bg-white"
+                )}
               >
                 <div className="w-12 h-12 rounded-full bg-[#00a884] flex items-center justify-center text-white shrink-0 overflow-hidden shadow-sm">
                   <img src="https://picsum.photos/seed/noa-ai/100" alt="Noa AI" referrerPolicy="no-referrer" />
@@ -940,6 +946,39 @@ export default function App() {
                   </p>
                 </div>
                 {isMobile && <ChevronLeft className="w-4 h-4 text-gray-300" />}
+              </div>
+
+              <div className="px-4 py-2 bg-gray-50 border-y border-gray-100 italic text-[10px] text-gray-400 font-bold tracking-widest uppercase shrink-0">
+                 ניהול ומעקב
+              </div>
+              <div 
+                onClick={() => handleActiveViewChange('history')}
+                className={cn(
+                  "flex items-center px-4 py-3 gap-3 cursor-pointer hover:bg-[#f0f2f5] transition-all border-b border-gray-100 group active:bg-gray-200",
+                  activeView === 'history' && "bg-[#f0f2f5] border-r-4 border-[#00a884] shadow-inner"
+                )}
+              >
+                <div className={cn(
+                  "w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors shadow-sm",
+                  activeView === 'history' ? "bg-[#00a884] text-white" : "bg-gray-100 text-[#54656f] group-hover:bg-[#00a884] group-hover:text-white"
+                )}>
+                  <History className="w-6 h-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className={cn(
+                    "text-sm font-semibold truncate",
+                    activeView === 'history' ? "text-[#00a884]" : "text-[#111b21]"
+                  )}>היסטוריית הזמנות</h3>
+                  <p className="text-[11px] text-gray-400 truncate">דו"ח ביצועים וסינון חכם</p>
+                </div>
+                <ChevronLeft className={cn(
+                  "w-4 h-4 transition-all opacity-0 group-hover:opacity-100",
+                  activeView === 'history' ? "text-[#00a884] opacity-100" : "text-gray-300"
+                )} />
+              </div>
+
+              <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 italic text-[10px] text-gray-400 font-bold tracking-widest uppercase shrink-0">
+                 צוותים פעילים
               </div>
               
               {/* Demo Contacts */}
@@ -965,15 +1004,27 @@ export default function App() {
             {/* Mobile Bottom Nav */}
             {isMobile && (
               <div className="h-[70px] bg-[#f0f2f5] border-t border-gray-200 flex items-center justify-around px-6 safe-bottom shrink-0">
-                <div className="flex flex-col items-center gap-1 text-[#00a884] cursor-pointer">
+                <div 
+                  onClick={() => handleActiveViewChange('sidebar')}
+                  className={cn(
+                    "flex flex-col items-center gap-1 cursor-pointer",
+                    activeView === 'sidebar' ? "text-[#00a884]" : "text-gray-400 font-medium"
+                  )}
+                >
                   <MessageSquare className="w-6 h-6" />
-                  <span className="text-[10px] font-bold">צ'אטים</span>
+                  <span className="text-[10px]">צ'אטים</span>
                 </div>
-                <div className="flex flex-col items-center gap-1 text-gray-400 cursor-pointer">
-                  <LayoutGrid className="w-6 h-6" />
-                  <span className="text-[10px]">משימות</span>
+                <div 
+                  onClick={() => handleActiveViewChange('history')}
+                  className={cn(
+                    "flex flex-col items-center gap-1 cursor-pointer",
+                    activeView === 'history' ? "text-[#00a884]" : "text-gray-400 font-medium"
+                  )}
+                >
+                  <History className="w-6 h-6" />
+                  <span className="text-[10px]">היסטוריה</span>
                 </div>
-                <div className="flex flex-col items-center gap-1 text-gray-400 cursor-pointer">
+                <div className="flex flex-col items-center gap-1 text-gray-400 cursor-pointer opacity-40">
                   <Settings className="w-6 h-6" />
                   <span className="text-[10px]">הגדרות</span>
                 </div>
@@ -983,63 +1034,69 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Main Chat Area */}
+      {/* Main Area */}
       <AnimatePresence mode="wait">
-        {(!isMobile || activeView === 'chat') && (
+        {(!isMobile || activeView === 'chat' || activeView === 'history') && (
           <motion.div 
-            initial={isMobile ? { x: "-100%" } : false}
-            animate={{ x: 0 }}
+            key={activeView}
+            initial={isMobile ? { x: "-100%" } : { opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
             exit={isMobile ? { x: "-100%" } : { opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className="flex-1 flex flex-col h-full bg-[#efeae2] relative shadow-inner overflow-hidden"
           >
-            <Header 
-              user={user} 
-              toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
-              isSidebarOpen={isSidebarOpen} 
-              isMobile={isMobile}
-              onBack={isMobile ? () => handleActiveViewChange('sidebar') : undefined}
-            />
-        
-        {/* Messages List */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 md:px-10 space-y-2 custom-scrollbar pb-10">
-          <div className="flex justify-center mb-6">
-            <span className="bg-[#e1f3fb] text-[#54656f] text-[11px] px-3 py-1 rounded-md uppercase font-medium">
-              today
-            </span>
-          </div>
+            {activeView === 'history' ? (
+              <OrderHistory onBack={() => handleActiveViewChange('sidebar')} />
+            ) : (
+              <>
+                <Header 
+                  user={user} 
+                  toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
+                  isSidebarOpen={isSidebarOpen} 
+                  isMobile={isMobile}
+                  onBack={isMobile ? () => handleActiveViewChange('sidebar') : undefined}
+                />
+            
+                {/* Messages List */}
+                <div className="flex-1 overflow-y-auto px-4 py-6 md:px-10 space-y-2 custom-scrollbar pb-10">
+                  <div className="flex justify-center mb-6">
+                    <span className="bg-[#e1f3fb] text-[#54656f] text-[11px] px-3 py-1 rounded-md uppercase font-medium">
+                      today
+                    </span>
+                  </div>
 
-          <div className="flex justify-center mb-4">
-            <div className="bg-[#fff9c6] text-[#111b21] text-[11px] px-4 py-2 rounded-lg shadow-sm text-center max-w-md">
-              🔒 הודעות ואתגרים מוצפנים מקצה לקצה. לאף אחד מחוץ לצ'אט זה, אפילו לא לסבאן, אין אפשרות לקרוא אותם.
-            </div>
-          </div>
+                  <div className="flex justify-center mb-4">
+                    <div className="bg-[#fff9c6] text-[#111b21] text-[11px] px-4 py-2 rounded-lg shadow-sm text-center max-w-md">
+                      🔒 הודעות ואתגרים מוצפנים מקצה לקצה. לאף אחד מחוץ לצ'אט זה, אפילו לא לסבאן, אין אפשרות לקרוא אותם.
+                    </div>
+                  </div>
 
-          {messages.map((m) => (
-            <MessageBubble key={m.id} message={m} isMe={m.senderId === user.uid} onReact={handleReact} />
-          ))}
-          
-          {isNoaTyping && (
-            <div className="flex justify-start mb-4">
-              <div className="italic text-sm text-[#00a884] font-medium mr-2">
-                נועה מקלידה...
-              </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
+                  {messages.map((m) => (
+                    <MessageBubble key={m.id} message={m} isMe={m.senderId === user.uid} onReact={handleReact} />
+                  ))}
+                  
+                  {isNoaTyping && (
+                    <div className="flex justify-start mb-4">
+                      <div className="italic text-sm text-[#00a884] font-medium mr-2">
+                        נועה מקלידה...
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div ref={messagesEndRef} />
+                </div>
 
-          <InputArea 
-            onSendMessage={handleSendMessage} 
-            onSendFile={handleSendFile} 
-            onSendAudio={handleSendAudio}
-            isTyping={isNoaTyping} 
-          />
-        </motion.div>
-      )}
-    </AnimatePresence>
-
+                <InputArea 
+                  onSendMessage={handleSendMessage} 
+                  onSendFile={handleSendFile} 
+                  onSendAudio={handleSendAudio}
+                  isTyping={isNoaTyping} 
+                />
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     <style>{`
       html, body, #root {
         height: 100%;

@@ -34,11 +34,14 @@ export interface Message {
 export interface Order {
   id?: string;
   customer: string;
-  items: string[];
+  customerName?: string;
+  items: string[] | string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'preparing' | 'ready';
   destination?: string;
   warehouse?: string;
-  createdBy: string;
+  driverId?: string;
+  driverName?: string;
+  createdBy?: string;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 }
