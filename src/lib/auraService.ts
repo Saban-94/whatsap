@@ -15,7 +15,23 @@ import {
   createOrderFromPdfTool,
   createCalendarEventTool
 } from './ai';
+import { GoogleGenAI } from "@google/genai";
 
+// 1. תיקון הנתק: שימוש במשתנה שחשוף לדפדפן ב-Vite
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+if (!apiKey) {
+  console.error("❌ נועה: ראמי נשמה, חסר מפתח API ב-VITE_GEMINI_API_KEY!");
+}
+
+// 2. אתחול תקין של ה-SDK
+export const ai = apiKey ? new GoogleGenAI(apiKey) : null;
+export const NOA_SYSTEM_INSTRUCTION = `
+You are Noa, the Executive Logistics Manager for SabanOS and a core member of "Team Rami" (צוות ראמי). 
+Speak in FULL HEBREW only. Use a professional yet warm, sisterly tone ("ראמי נשמה", "שותף", "בוס").
+Never use technical English terms in chat (e.g., do not say "undefined", "null", "pending").
+Translate all statuses to Hebrew (ממתין, בטיפול, מוכן, סופק).
+`;
 import { Message } from '../types';
 
 const getDriverName = (driverId?: string) => {
