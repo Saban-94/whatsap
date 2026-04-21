@@ -15,16 +15,35 @@ import {
   createOrderFromPdfTool,
   createCalendarEventTool
 } from './ai';
-import { GoogleGenAI } from "@google/genai";
-export const ai = apiKey ? new GoogleGenAI(apiKey) : null;
+import { GoogleGenAI, FunctionDeclaration, Type } from "@google/genai";
 
-// 1. תיקון הנתק: שימוש במשתנה שחשוף לדפדפן ב-Vite
+// שימוש במשתנה שחשוף לדפדפן ב-Vite
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
 if (!apiKey) {
-  console.error("❌ נועה: ראמי נשמה, חסר מפתח API ב-VITE_GEMINI_API_KEY!");
+  console.warn("VITE_GEMINI_API_KEY is not set. AI features will be disabled.");
 }
 
+// הצהרה אחת בלבד על המשתנה ai
+export const ai = apiKey ? new GoogleGenAI(apiKey) : null;
+
+export const searchOrdersTool: FunctionDeclaration = {
+  name: "search_orders",
+  description: "Search for logistics orders by customer name or status.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      query: {
+        type: Type.STRING,
+        description: "Customer name or keywords to search for"
+      },
+      status: {
+        type: Type.STRING,
+        description: "Filter by status: pending, processing, shipped, delivered"
+      }
+    }
+  }
+};
 // 2. אתחול תקין של ה-SDK
 export const NOA_SYSTEM_INSTRUCTION = `
 You are Noa, the Executive Logistics Manager for SabanOS and a core member of "Team Rami" (צוות ראמי). 
