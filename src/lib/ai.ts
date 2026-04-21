@@ -1,12 +1,13 @@
 // src/lib/ai.ts
-import { GoogleGenAI, FunctionDeclaration, Type } from "@google/genai";
-// הדרך היחידה ש-Vite "רואה" את המפתח בדפדפן
+
+// הדרך הנכונה ב-Vite
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
 if (!apiKey) {
-  // זה יודפס לך ב-Console אם המפתח עדיין לא עובר מהשרת
-  console.error("קריטי: המפתח VITE_GEMINI_API_KEY לא זוהה בדפדפן!");
+  // אם תראה את זה ב-Console, סימן שהמפתח לא עבר מ-Vercel
+  console.error("נועה: ראמי נשמה, המפתח עדיין חסר בהגדרות המערכת!");
 }
+
 
 // אתחול המנוע
 
