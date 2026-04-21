@@ -413,12 +413,12 @@ export default function App() {
           
           if (now - orderTime < 30000 && order.createdBy !== 'noa') {
             const chatId = `chat_${user.uid}_noa`;
-            const safeCustomerName = order.customerName || order.orderNumber || "לקוח לא מזוהה";
-            const customerDisplay = getCustomerDisplay({ ...order, customerName: safeCustomerName });
+            const customerDisplay = getCustomerDisplay(order);
             const itemsDisplay = getItemsDisplay(order.items);
             
             // Check for Itzik's profile to personalize
-            let noaMessage = `📢 [הזמנה חדשה - קבוצת סידור]\n\n🚀 ראמי נשמה, נכנסה הזמנה חדשה בסידור!\n\n🔹 לקוח: ${customerDisplay}\n🔹 פריטים: ${itemsDisplay}\n🔹 יעד: ${order.destination || 'ממתין לעדכון בכתובת'}\n\nהמערכת בודקת כרגע זמינות נהגים...`;            
+            let noaMessage = `📢 [Saban Messenger - קבוצת נהגים]\n\n🚀 ראמי נשמה, נכנסה הזמנה חדשה בסידור!\n\n🔹 לקוח: ${customerDisplay}\n🔹 פריטים: ${itemsDisplay}\n🔹 יעד: ${order.destination || 'ממתין לעדכון'}\n\nהמערכת בודקת כרגע זמינות נהגים...`;
+            
             try {
               const profileSnap = await getDocs(query(collection(db, 'profiles'), where('email', '==', user.email)));
               if (!profileSnap.empty) {

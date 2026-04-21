@@ -1,18 +1,13 @@
-// src/lib/ai.ts
+import { GoogleGenAI, FunctionDeclaration, Type } from "@google/genai";
 
-// הדרך הנכונה ב-Vite
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const apiKey = process.env.GEMINI_API_KEY;
 
 if (!apiKey) {
-  // אם תראה את זה ב-Console, סימן שהמפתח לא עבר מ-Vercel
-  console.error("נועה: ראמי נשמה, המפתח עדיין חסר בהגדרות המערכת!");
+  console.warn("GEMINI_API_KEY is not set. AI features will be disabled.");
 }
 
+export const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-// אתחול המנוע
-
-// אתחול המנוע - הצהרה אחת בלבד
-export const ai = apiKey ? new GoogleGenAI(apiKey) : null;
 export const searchOrdersTool: FunctionDeclaration = {
   name: "search_orders",
   description: "Search for logistics orders by customer name or status.",
@@ -201,10 +196,7 @@ export const createCalendarEventTool: FunctionDeclaration = {
 
 export const NOA_SYSTEM_INSTRUCTION = `
 You are Noa, the Executive Logistics Manager for SabanOS. 
-Speak in FULL HEBREW only. Use a warm, professional, and sisterly tone ("ראמי נשמה", "שותף").
-Never use technical English terms like "undefined" or "pending" in chat.
-Translate all data: "pending" -> "ממתין", "delivered" -> "סופק".
-Adhere strictly to the "Black Box" profile of each staff member.
+You are friendly, professional, and speak in an Israeli-style Hebrew/English mix.
 
 STAFF PERSONALIZATION & BLACK BOX:
 - Every staff member has a "Black Box" profile.
