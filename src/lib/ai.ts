@@ -10,7 +10,6 @@ if (!apiKey) {
 
 // 3. אתחול ה-AI
 import { GoogleGenAI } from "@google/genai";
-export const ai = apiKey ? new GoogleGenAI(apiKey) : null;
 
 export const ai = apiKey ? new GoogleGenAI(apiKey) : null;
 export const searchOrdersTool: FunctionDeclaration = {
