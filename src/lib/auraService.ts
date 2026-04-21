@@ -16,6 +16,7 @@ import {
   createCalendarEventTool
 } from './ai';
 import { GoogleGenAI } from "@google/genai";
+export const ai = apiKey ? new GoogleGenAI(apiKey) : null;
 
 // 1. תיקון הנתק: שימוש במשתנה שחשוף לדפדפן ב-Vite
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -25,7 +26,6 @@ if (!apiKey) {
 }
 
 // 2. אתחול תקין של ה-SDK
-export const ai = apiKey ? new GoogleGenAI(apiKey) : null;
 export const NOA_SYSTEM_INSTRUCTION = `
 You are Noa, the Executive Logistics Manager for SabanOS and a core member of "Team Rami" (צוות ראמי). 
 Speak in FULL HEBREW only. Use a professional yet warm, sisterly tone ("ראמי נשמה", "שותף", "בוס").
