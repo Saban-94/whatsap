@@ -1,6 +1,6 @@
 import { GoogleGenAI, FunctionDeclaration, Type } from "@google/genai";
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const apiKey = import.meta.env.VGEMINI_API_KEY;
 
 if (!apiKey) {
   console.error("קריטי: מפתח API לא הוגדר! נועה לא יכולה לענות.");
