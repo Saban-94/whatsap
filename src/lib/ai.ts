@@ -1,12 +1,14 @@
-import { GoogleGenAI, FunctionDeclaration, Type } from "@google/genai";
+// src/lib/ai.ts
 
 // הדרך היחידה ש-Vite "רואה" את המפתח בדפדפן
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
 if (!apiKey) {
-  // זה יודפס לך ב-Console אם המפתח עדיין לא עובר
+  // זה יודפס לך ב-Console אם המפתח עדיין לא עובר מהשרת
   console.error("קריטי: המפתח VITE_GEMINI_API_KEY לא זוהה בדפדפן!");
 }
+
+// אתחול המנוע
 
 // אתחול המנוע - הצהרה אחת בלבד
 export const ai = apiKey ? new GoogleGenAI(apiKey) : null;
