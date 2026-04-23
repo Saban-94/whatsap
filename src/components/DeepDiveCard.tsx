@@ -1,7 +1,6 @@
 import React from 'react';
 import { CheckSquare, Package, MapPin, User, Hash } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { getCustomerDisplay } from '../lib/orderUtils';
 
 interface DeepDiveCardProps {
   order: {
@@ -17,52 +16,26 @@ interface DeepDiveCardProps {
 }
 
 export const DeepDiveCard: React.FC<DeepDiveCardProps> = ({ order }) => {
-  const customerName = getCustomerDisplay(order as any);
+  const customerName = order.customerName || order.customer || 'לקוח לא ידוע';
   
   // Logic to parse items string as requested by the user
   const parseItems = (itemsInput: string | string[]) => {
     if (Array.isArray(itemsInput)) return itemsInput;
     if (!itemsInput || typeof itemsInput !== 'string') return [];
     
-    // First, check for obvious delimiters
-    if (itemsInput.includes(',') || itemsInput.includes('\n') || itemsInput.includes(';')) {
-      return itemsInput.split(/[,\n;]/).map(s => s.trim()).filter(Boolean);
-    }
-
-    // Advanced Logistics Parsing: Handles mixed delimiters and dimensions (e.g., "500 3 מטר")
-    // Dimensional/Unit list to ignore as "New Item" starters
-    const units = ['מטר', 'מ', 'סמ', 'ממ', 'צול', "מ'", 'מ"', 'ס"מ', 'מ"מ', 'ק"ג', 'קג', 'יח', 'יחידה', 'יחידות', 'חבילה', 'שק'];
+    // User requested Regex Parsing: split when a new item pattern (number + text) is found
+    // We match a number followed by everything UNTIL we see another number that starts a new entry (number + space)
+    const regex = /(\d+\s+.*?(?=(?:\s+\d+\s+)|$))/g;
+    const matches = itemsInput.match(regex);
     
-    // Normalize and split by space
-    const words = itemsInput.replace(/\s+/g, ' ').trim().split(' ');
-    const result: string[] = [];
-    let currentItem = '';
-
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i];
-      const nextWord = words[i + 1];
-
-      // Is this word a candidate for a new item quantity? (e.g., "10", "10x", "5*")
-      const isQuantity = /^\d+([xX*])?$/.test(word);
-      
-      // A quantity is a "New Item Starter" ONLY IF:
-      // 1. It's not the first word AND...
-      // 2. The next word is NOT a unit (like "מטר") AND...
-      // 3. The next word is NOT another number (like dimensions "500 3")
-      const looksLikeNewItem = isQuantity && nextWord && 
-                               !/^\d/.test(nextWord) && 
-                               !units.some(u => nextWord.startsWith(u));
-
-      if (looksLikeNewItem && currentItem !== '') {
-        result.push(currentItem.trim());
-        currentItem = word;
-      } else {
-        currentItem += (currentItem === '' ? '' : ' ') + word;
-      }
-    }
-
-    if (currentItem) result.push(currentItem.trim());
-    return result.length > 0 ? result : [itemsInput];
+    // Re-combining algorithm: if a part is just a number (like 500 or 3), it might have been greedy.
+    // For "10 צינור קרטון 500 3 מטר", we want to keep them together if they are part of dimensions.
+    // A heuristic: if the quantity is very large or followed by units, it's likely part of the name.
+    
+    if (!matches || matches.length === 0) return [itemsInput];
+    
+    // Clean and return
+    return matches.map(m => m.trim());
   };
 
   const itemsList = parseItems(order.items || '');
@@ -117,7 +90,7 @@ export const DeepDiveCard: React.FC<DeepDiveCardProps> = ({ order }) => {
               <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
                 <User className="w-3.5 h-3.5" />
               </div>
-              <span className="font-semibold text-gray-700">נהג מעמיס: {order.driverId === 'ali' ? 'עלי' : order.driverId === 'hikmat' ? 'חיכמת' : (order.driverName || order.driverId)}</span>
+              <span className="font-semibold text-gray-700">נהג: {order.driverId === 'ali' ? 'עלי' : order.driverId === 'hikmat' ? 'חיכמת' : order.driverId}</span>
             </div>
           </div>
         )}

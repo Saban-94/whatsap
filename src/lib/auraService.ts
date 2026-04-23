@@ -11,43 +11,16 @@ import {
   driverReportTool,
   updateOrderStatusTool,
   assignDriverTool,
-  generateDriverBriefTool,
-  createOrderFromPdfTool,
-  createCalendarEventTool
+  generateDriverBriefTool
 } from './ai';
 
-import { Message } from '../types';
-
-const getDriverName = (driverId?: string) => {
-  if (!driverId) return 'טרם שובץ';
-  const mapping: Record<string, string> = {
-    'ali': 'עלי',
-    'hikmat': 'חיכמת',
-    'hikmet': 'חיכמת',
-    'sami': 'סאמי',
-    'ahmed': 'אחמד'
-  };
-  return mapping[driverId.toLowerCase()] || driverId;
-};
-
-export const processNoaTurn = async (userText: string, user: any, history: Message[] = [], filePart?: any) => {
+export const processNoaTurn = async (userText: string, user: any) => {
   if (!ai || !user) return null;
 
   const now = new Date();
   const currentDateTime = format(now, 'yyyy-MM-dd HH:mm:ss');
   const dayName = format(now, 'EEEE');
   const todayISO = format(now, 'yyyy-MM-dd');
-
-  // Fetch staff "Black Box" rules
-  let blackBoxRules = "";
-  try {
-    const staffSnap = await getDocs(query(collection(db, 'profiles'), where('email', '==', user.email)));
-    if (!staffSnap.empty) {
-      blackBoxRules = staffSnap.docs[0].data().introductionRules || "";
-    }
-  } catch (err) {
-    console.warn("Could not fetch staff rules:", err);
-  }
 
   let displayName = user.displayName || 'ראמי';
   if (displayName === 'Saban' || displayName === 'ח. סבן' || displayName.includes('Saban')) {
@@ -60,14 +33,8 @@ export const processNoaTurn = async (userText: string, user: any, history: Messa
 Current Time: ${currentDateTime}
 Day: ${dayName}
 Current User: ${displayName}
-${blackBoxRules ? `SPECIAL INSTRUCTIONS FOR THIS USER (BLACK BOX): ${blackBoxRules}` : ""}
 Message: ${userText}
 `;
-
-  const chatHistory = history.slice(-10).map(m => ({
-    role: m.senderId === 'noa' ? 'model' : 'user',
-    parts: [{ text: m.text }]
-  }));
 
   const availableTools = [
     searchOrdersTool, 
@@ -77,22 +44,13 @@ Message: ${userText}
     driverReportTool,
     updateOrderStatusTool,
     assignDriverTool,
-    generateDriverBriefTool,
-    createOrderFromPdfTool,
-    createCalendarEventTool
+    generateDriverBriefTool
   ];
-
-  const contents: any[] = [...chatHistory, { role: 'user', parts: [{ text: prompt }] }];
-  
-  if (filePart) {
-    // Add file part to the last message part
-    contents[contents.length - 1].parts.push(filePart);
-  }
 
   try {
     let response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents,
+      contents: prompt,
       config: {
         systemInstruction: NOA_SYSTEM_INSTRUCTION,
         tools: [{ functionDeclarations: availableTools }]
@@ -119,7 +77,6 @@ Message: ${userText}
           const snap = await getDocs(q);
           let results = snap.docs.map(d => {
             const data = d.data() as any;
-            const customerName = data.customerName || data.customer || 'לקוח לא ידוע';
             
             // Robust mapping: try multiple variations just in case
             const rawItemsData = data.items || data.Items || data.item_list || data.list;
@@ -132,15 +89,13 @@ Message: ${userText}
             
             return {
               id: d.id,
-              customer: customerName,
-              customerName: customerName, // REDUNDANCY
+              customer: data.customerName || data.customer || 'לקוח לא ידוע',
               destination: data.destination || 'יעד לא צוין',
               warehouse: data.warehouse || 'מחסן כללי',
               status: data.status || 'pending',
               items: rawItems,
               date: data.date,
-              driverId: data.driverId,
-              driverName: getDriverName(data.driverId)
+              driverId: data.driverId
             };
           });
           
@@ -198,18 +153,14 @@ Message: ${userText}
             // Raw String Injection for items
             const rawItems = Array.isArray(rawItemsData) ? rawItemsData.join(', ') : (rawItemsData || "לא הוזנו פריטים");
             
-            const cName = orderData.customerName || orderData.customer || 'לקוח לא ידוע';
-            
             // Flat Tool Response as requested: { items, customer, orderId }
             const flatResult = {
               items: rawItems,
-              customer: cName,
-              customerName: cName, // REDUNDANCY
+              customer: orderData.customerName || orderData.customer || 'לקוח לא ידוע',
               orderId: orderData.id,
               destination: orderData.destination,
               status: orderData.status,
-              driverId: orderData.driverId,
-              driverName: getDriverName(orderData.driverId)
+              driverId: orderData.driverId
             };
             
             console.log(`[Noa Debug] get_order_details found:`, flatResult.customer);
@@ -249,34 +200,15 @@ Message: ${userText}
 
         } else if (call.name === "create_order") {
           const { customer, items } = call.args as any;
-          
-          // Ensure items is a string for the database
-          const itemsStr = Array.isArray(items) ? items.join(', ') : (items || "לא הוזנו פריטים");
-
           const docRef = await addDoc(collection(db, 'orders'), {
-            customer: customer || 'לקוח לא ידוע',
-            customerName: customer || 'לקוח לא ידוע', // Sync both
-            items: itemsStr,
+            customerName: customer,
+            items: items || ["פריטים מהצ'אט"],
             status: 'pending',
             createdBy: 'noa',
             createdAt: serverTimestamp(),
             date: todayISO
           });
-
-          const confirmation = { 
-            success: true, 
-            orderId: docRef.id, 
-            customer: customer,
-            items: itemsStr,
-            message: `הזמנה עבור ${customer} נוצרה בהצלחה במערכת.`
-          };
-
-          console.log(`[Noa Debug] create_order successful for: ${customer}`);
-          toolOutputs.push({ 
-            name: call.name, 
-            output: { content: JSON.stringify(confirmation) }, 
-            id: (call as any).id 
-          });
+          toolOutputs.push({ name: call.name, output: { content: JSON.stringify({ success: true, orderId: docRef.id }) }, id: (call as any).id });
         } else if (call.name === "driver_report") {
           const { driverName, truckNumber, kilometers, notes } = call.args as any;
           const docRef = await addDoc(collection(db, 'driver_reports'), {
@@ -304,64 +236,6 @@ Message: ${userText}
             result = orderDoc.data();
           }
           toolOutputs.push({ name: call.name, output: { content: JSON.stringify(result) }, id: (call as any).id });
-        } else if (call.name === "create_order_from_pdf") {
-          const { customerName, items, destination, orderNumber, date } = call.args as any;
-          
-          // Deduplication Check
-          const qExist = query(collection(db, 'orders'), where('orderNumber', '==', orderNumber));
-          const snapExist = await getDocs(qExist);
-          
-          if (!snapExist.empty) {
-            console.log(`[Noa Debug] Duplicate orderNumber blocked: ${orderNumber}`);
-            toolOutputs.push({ 
-              name: call.name, 
-              output: { content: JSON.stringify({ success: false, error: "Duplicate orderNumber", message: `הזמנה מספר ${orderNumber} כבר קיימת במערכת.` }) }, 
-              id: (call as any).id 
-            });
-          } else {
-            const cName = customerName || 'לקוח לא ידוע';
-            const docRef = await addDoc(collection(db, 'orders'), {
-              customer: cName,
-              customerName: cName,
-              items,
-              destination,
-              orderNumber,
-              status: 'preparing',
-              createdBy: 'noa_pdf',
-              createdAt: serverTimestamp(),
-              date: date || todayISO
-            });
-
-            console.log(`[Noa Debug] create_order_from_pdf successful for: ${customerName} (${orderNumber})`);
-            toolOutputs.push({ 
-              name: call.name, 
-              output: { content: JSON.stringify({ success: true, orderId: docRef.id, message: `הזמנה ${orderNumber} של ${customerName} הוקמה בהצלחה.` }) }, 
-              id: (call as any).id 
-            });
-          }
-        } else if (call.name === "create_calendar_event") {
-          const { summary, description, startTime, endTime, attendees } = call.args as any;
-          
-          // In a real production app, we would use googleapis with a service account or user OAuth token
-          // Here we simulate the successful creation and note the reminder logic
-          console.log(`[Noa Debug] Creating Calendar Event: ${summary} at ${startTime}`);
-          
-          // Mocking storage of the event for reminder logic (e.g. in a 'reminders' collection)
-          await addDoc(collection(db, 'reminders'), {
-            summary,
-            description,
-            startTime,
-            userEmail: user.email,
-            status: 'pending',
-            reminderSent: false,
-            createdAt: serverTimestamp()
-          });
-
-          toolOutputs.push({ 
-            name: call.name, 
-            output: { content: JSON.stringify({ success: true, message: `האירוע "${summary}" נקבע ביומן. תזכורת תישלח חצי שעה לפני.` }) }, 
-            id: (call as any).id 
-          });
         }
       }
 
@@ -369,7 +243,7 @@ Message: ${userText}
       response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: [
-          ...contents,
+          { role: 'user', parts: [{ text: prompt }] },
           response.candidates[0].content, 
           { 
             role: 'user', 

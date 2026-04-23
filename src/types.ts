@@ -29,13 +29,11 @@ export interface Message {
   duration?: number;
   reactions?: Record<string, string[]>; // emoji -> list of userIds
   createdAt: Timestamp;
-  date?: string;
 }
 
 export interface Order {
   id?: string;
-  orderNumber?: string;
-  customer?: string;
+  customer: string;
   customerName?: string;
   items: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'preparing' | 'ready';
@@ -45,17 +43,5 @@ export interface Order {
   driverName?: string;
   createdBy?: string;
   createdAt: Timestamp;
-  updatedAt?: Timestamp;
-  date?: string;
-}
-
-export interface StaffProfile {
-  id: string;
-  name: string;
-  role: string;
-  email: string;
-  profileLink?: string;
-  introductionRules: string;
-  calendarEnabled: boolean;
   updatedAt?: Timestamp;
 }

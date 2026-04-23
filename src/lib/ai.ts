@@ -162,74 +162,9 @@ export const generateDriverBriefTool: FunctionDeclaration = {
   }
 };
 
-export const createOrderFromPdfTool: FunctionDeclaration = {
-  name: "create_order_from_pdf",
-  description: "Create a new order based on data extracted from a PDF/Document.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      customerName: { type: Type.STRING },
-      items: { type: Type.STRING },
-      destination: { type: Type.STRING },
-      orderNumber: { type: Type.STRING },
-      date: { type: Type.STRING }
-    },
-    required: ["customerName", "items", "orderNumber"]
-  }
-};
-
-export const createCalendarEventTool: FunctionDeclaration = {
-  name: "create_calendar_event",
-  description: "Create a new event in the user's Google Calendar.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      summary: { type: Type.STRING, description: "Title of the event" },
-      description: { type: Type.STRING, description: "Notes or details" },
-      startTime: { type: Type.STRING, description: "ISO date-time string (e.g. 2026-04-20T10:00:00Z)" },
-      endTime: { type: Type.STRING, description: "ISO date-time string" },
-      attendees: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of guest emails" }
-    },
-    required: ["summary", "startTime", "endTime"]
-  }
-};
-
 export const NOA_SYSTEM_INSTRUCTION = `
 You are Noa, the Executive Logistics Manager for SabanOS. 
 You are friendly, professional, and speak in an Israeli-style Hebrew/English mix.
-
-STAFF PERSONALIZATION & BLACK BOX:
-- Every staff member has a "Black Box" profile.
-- You will be given "SPECIAL INSTRUCTIONS FOR THIS USER" at the start of each prompt if they exist.
-- ADHERE TO THESE RULES STRICTLY. If the rules say "short reports", be concise. If they say "remind him every morning", do it.
-
-GOOGLE CALENDAR INTEGRATION:
-- You have the authority to manage the team's calendars via 'create_calendar_event'.
-- When a user mentions a task with a time (e.g. "הגעת סחורה ב-10"), offer to put it in their calendar.
-- Mention that an automatic WhatsApp reminder will be sent 30 minutes before the event.
-
-WAREHOUSE-BASED DASHBOARD (Morning Report):
-1. Fixed Warehouse Tabs: System has 3 main warehouses:
-   - מחסן החרש (נוה נאמן) - Main hub.
-   - מחסן התלמיד - Secondary hub.
-   - מחסן החרש - צוות 3 (עתודה/סידור) - Specialized team.
-2. MAPPING LOGIC: Assign every order to a warehouse in Firestore via 'warehouse' field. If 'החרש', show as loading task in החרש tab.
-3. DRIVER ROLE: Drivers (עלי, חיכמת) are SECONDARY info. The Warehouse IS the owner. Display as "נהג מעמיס: עלי".
-4. MORNING WORKFLOW: Warehouse preparation triggers 'To-Do' lists. When prep is done, status changes to 'ready', signaling drivers to pick up.
-
-PDF & DOCUMENT ANALYSIS (AUTO-ORDER):
-1. When a PDF or document is uploaded, extract the following:
-   - customerName: The customer's identity.
-   - items: Clean text list of items and quantities.
-   - destination: Delivery address.
-   - orderNumber: The document/invoice/order number.
-2. CONFIRMATION FLOW (MANDATORY):
-   - DO NOT create the order immediately.
-   - Present the summary to Rami (the user).
-   - Ask: "ראמי נשמה, שלפתי את הנתונים מה-PDF, להזין אותם כהזמנה חדשה ללוח?".
-   - ONLY call 'create_order_from_pdf' if Rami confirms (e.g., "כן", "בצע", "סגור").
-3. DEDUPLICATION:
-   - The system automatically checks for existing 'orderNumber'. You will be notified if it's a duplicate.
 
 EXECUTIVE ACTIONS (WRITE ACCESS):
 1. UPDATE STATUS: You have the authority to update order statuses. If the user says "mark as ready" or "update status", use 'update_order_status'.

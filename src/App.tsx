@@ -26,11 +26,10 @@ import {
   LayoutGrid,
   Eye,
   Maximize2,
-  History, Warehouse, Users,
+  History,
   Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { getCustomerDisplay, getItemsDisplay } from './lib/orderUtils';
 import { 
   collection, 
   query, 
@@ -56,8 +55,6 @@ import remarkGfm from 'remark-gfm';
 import { OrderHistory } from './components/OrderHistory';
 import { DeepDiveCard } from './components/DeepDiveCard';
 import { NoaChat } from './components/NoaChat';
-import { WarehouseDashboard } from './components/WarehouseDashboard';
-import { StaffSettings } from './components/StaffSettings';
 
 // --- Components ---
 
@@ -344,30 +341,16 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNoaTyping, setIsNoaTyping] = useState(false);
-  const [activeView, setActiveView] = useState<'sidebar' | 'chat' | 'history' | 'warehouse' | 'staff'>('sidebar');
+  const [activeView, setActiveView] = useState<'sidebar' | 'chat' | 'history'>('sidebar');
   const [historyOrderId, setHistoryOrderId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [isFocused, setIsFocused] = useState(true);
-
-  // Focus tracking
-  useEffect(() => {
-    const onFocus = () => setIsFocused(true);
-    const onBlur = () => setIsFocused(false);
-    window.addEventListener('focus', onFocus);
-    window.addEventListener('blur', onBlur);
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      window.removeEventListener('blur', onBlur);
-    };
-  }, []);
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleActiveViewChange = (view: 'sidebar' | 'chat' | 'history' | 'warehouse' | 'staff') => {
+  const handleActiveViewChange = (view: 'sidebar' | 'chat' | 'history') => {
     if (isTransitioning) return;
     setIsTransitioning(true);
-    setActiveView(view as any);
+    setActiveView(view);
     if (view !== 'history') setHistoryOrderId(null); // Reset when leaving history
     setTimeout(() => setIsTransitioning(false), 400); // Buffer for animation
   };
@@ -411,40 +394,13 @@ export default function App() {
           const orderTime = order.createdAt?.toMillis() || 0;
           const now = Date.now();
           
+          // Only notify for fresh orders (last 30 seconds) not created by Noa itself to avoid loops
           if (now - orderTime < 30000 && order.createdBy !== 'noa') {
             const chatId = `chat_${user.uid}_noa`;
-            const customerDisplay = getCustomerDisplay(order);
-            const itemsDisplay = getItemsDisplay(order.items);
             
-            // Check for Itzik's profile to personalize
-            let noaMessage = `📢 [Saban Messenger - קבוצת נהגים]\n\n🚀 ראמי נשמה, נכנסה הזמנה חדשה בסידור!\n\n🔹 לקוח: ${customerDisplay}\n🔹 פריטים: ${itemsDisplay}\n🔹 יעד: ${order.destination || 'ממתין לעדכון'}\n\nהמערכת בודקת כרגע זמינות נהגים...`;
-            
-            try {
-              const profileSnap = await getDocs(query(collection(db, 'profiles'), where('email', '==', user.email)));
-              if (!profileSnap.empty) {
-                const profile = profileSnap.docs[0].data();
-                if (profile.name.includes('איציק')) {
-                  noaMessage = `איציק, רשמתי לך ביומן להכין את הציוד ל${customerDisplay} (${itemsDisplay}) לשעה הקרובה.`;
-                  
-                  // Auto-create calendar event in reminders as well
-                  await addDoc(collection(db, 'reminders'), {
-                    summary: `הכנת ציוד: ${customerDisplay}`,
-                    description: `פריטים: ${itemsDisplay}`,
-                    startTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
-                    userEmail: user.email,
-                    status: 'pending',
-                    reminderSent: false,
-                    createdAt: serverTimestamp()
-                  });
-                }
-              }
-            } catch (err) {
-              console.warn("Could not fetch profile for personalized messaging", err);
-            }
-
-            // Add automatic Noa message to chat
+            // Add automatic Noa message to chat (WhatsApp Interface Simulation)
             await addDoc(collection(db, 'chats', chatId, 'messages'), {
-              text: noaMessage,
+              text: `📢 [Saban Messenger - קבוצת נהגים]\n\n🚀 ראמי נשמה, נכנסה הזמנה חדשה בסידור!\n\n🔹 לקוח: ${order.customer}\n🔹 פריטים: ${Array.isArray(order.items) ? order.items.join(', ') : (order.items || 'לא צוין')}\n🔹 יעד: ${order.destination || 'ממתין לעדכון'}\n\nהמערכת בודקת כרגע זמינות נהגים...`,
               senderId: 'noa',
               senderName: 'Saban Messenger',
               status: 'sent',
@@ -455,7 +411,7 @@ export default function App() {
             // Native Push Notification Simulation
             if ("Notification" in window && Notification.permission === "granted") {
               new Notification("Saban Messenger (WhatsApp)", {
-                body: `הזמנה חדשה מ-${customerDisplay} - ${order.destination || ''}`,
+                body: `הזמנה חדשה מ-${order.customer} - ${order.destination || ''}`,
                 icon: "https://picsum.photos/seed/sabanos/192/192"
               });
             }
@@ -467,53 +423,6 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
   
-  // Calendar Reminder Engine
-  useEffect(() => {
-    if (!user) return;
-    
-    const checkReminders = async () => {
-      try {
-        const now = new Date();
-        const futureLimit = new Date(now.getTime() + 35 * 60000); // 35 minutes from now
-        
-        const q = query(
-          collection(db, 'reminders'),
-          where('userEmail', '==', user.email),
-          where('status', '==', 'pending'),
-          where('reminderSent', '==', false)
-        );
-        
-        const snap = await getDocs(q);
-        for (const docRef of snap.docs) {
-          const reminder = docRef.data();
-          const startTime = new Date(reminder.startTime);
-          
-          // If within 30-35 mins window
-          if (startTime > now && startTime <= futureLimit) {
-            const chatId = `chat_${user.uid}_noa`;
-            
-            await addDoc(collection(db, 'chats', chatId, 'messages'), {
-              text: `⏰ *תזכורת יומן:* איציק, עוד חצי שעה יש לך: ${reminder.summary}\n\n${reminder.description || ''}`,
-              senderId: 'noa',
-              senderName: 'Noa AI Reminders',
-              status: 'sent',
-              type: 'text',
-              createdAt: serverTimestamp()
-            });
-            
-            await updateDoc(docRef.ref, { reminderSent: true });
-            playAICompletion();
-          }
-        }
-      } catch (err) {
-        console.error("Reminder engine error:", err);
-      }
-    };
-
-    const interval = setInterval(checkReminders, 60000); // Check every minute
-    return () => clearInterval(interval);
-  }, [user]);
-
   // Sound effects
   const playTick = () => {
     const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
@@ -546,41 +455,14 @@ export default function App() {
       limit(50)
     );
 
-    const msgsUnsubscribe = onSnapshot(q, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === "added") {
-          const msg = change.doc.data() as any;
-          const msgTime = msg.createdAt?.toMillis() || Date.now();
-          const now = Date.now();
-          
-          // Only notify if:
-          // 1. It's from others (Noa)
-          // 2. The message is fresh (within last 15 seconds)
-          // 3. The window is not focused OR the chat is not the active view
-          if (msg.senderId !== user.uid && (now - msgTime < 15000)) {
-            if (!isFocused || (isMobile && activeView !== 'chat')) {
-              if ("Notification" in window && Notification.permission === "granted") {
-                new Notification(msg.senderName || "Saban Messenger", {
-                  body: msg.text,
-                  icon: "https://picsum.photos/seed/sabanos/192/192",
-                  tag: 'saban-msg-' + msg.senderId
-                });
-              }
-              playAICompletion(); // Play sound if not in focus
-            }
-          }
-        }
-      });
-
+    return onSnapshot(q, (snapshot) => {
       const msgs: Message[] = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as Message));
       setMessages(msgs);
     });
-
-    return () => msgsUnsubscribe();
-  }, [user, isFocused, isMobile, activeView]);
+  }, [user]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -686,59 +568,28 @@ export default function App() {
     await updateDoc(msgRef, { reactions });
   };
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64String = reader.result as string;
-        resolve(base64String.split(',')[1]);
-      };
-      reader.onerror = error => reject(error);
-    });
-  };
-
-  const markMessagesAsRead = async () => {
-    if (!user) return;
-    const chatId = `chat_${user.uid}_noa`;
-    const userMsgsQuery = query(
-      collection(db, 'chats', chatId, 'messages'),
-      where('senderId', '==', user.uid),
-      where('status', '==', 'sent')
-    );
-    
-    try {
-      const snapshot = await getDocs(userMsgsQuery);
-      const updates = snapshot.docs.map(d => 
-        updateDoc(doc(db, 'chats', chatId, 'messages', d.id), { status: 'read' })
-      );
-      await Promise.all(updates);
-    } catch (err) {
-      console.error("Error marking messages as read:", err);
-    }
-  };
-
   const handleAIAnalysis = async (file: File) => {
     if (!ai || !user) return;
     setIsNoaTyping(true);
     const chatId = `chat_${user.uid}_noa`;
 
     try {
-      const base64Data = await fileToBase64(file);
-      const filePart = {
-        inlineData: {
-          mimeType: file.type || 'application/pdf',
-          data: base64Data
-        }
-      };
-
-      const analysisPrompt = `משתמש העלה קובץ בשם "${file.name}". בצע ניתוח לוגיסטי. אם מדובר בתעודת משלוח או הזמנה, שלוף את הנתונים והצג סיכום לראמי. אל תשכח לשאול "ראמי נשמה, שלפתי את הנתונים מה-PDF, להזין אותם כהזמנה חדשה ללוח?" כפי שמופיע בהנחיות המערכת שלך.`;
-
-      const reply = await processNoaTurn(analysisPrompt, user, messages, filePart) || "קלטתי את הקובץ, אבל אני צריכה עוד רגע לעבד אותו. מה התוכנית?";
+      let analysisPrompt = `The user has uploaded a file named "${file.name}" (type: ${file.type || 'unknown'}). `;
       
-      // Mark as read after Processing is complete
-      await markMessagesAsRead();
+      // If it's a small enough representative file or we want to simulate deep analysis:
+      // For now, we use a prompt that describes the context to Noa.
+      analysisPrompt += `Please provide a professional logistics summary of this file and suggest the next steps for the Saban team.`;
 
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: analysisPrompt,
+        config: {
+          systemInstruction: NOA_SYSTEM_INSTRUCTION
+        }
+      });
+
+      const reply = response.text || "קלטתי את הקובץ, אבל אני צריכה עוד רגע לעבד אותו. מה התוכנית?";
+      
       setTimeout(async () => {
         await addDoc(collection(db, 'chats', chatId, 'messages'), {
           text: reply,
@@ -750,7 +601,7 @@ export default function App() {
         });
         playAICompletion();
         setIsNoaTyping(false);
-      }, 1000);
+      }, 2000);
 
     } catch (error) {
       console.error("Analysis Error:", error);
@@ -764,10 +615,20 @@ export default function App() {
     const chatId = `chat_${user.uid}_noa`;
 
     try {
-      const reply = await processNoaTurn(userText, user, messages) || "סליחה, אירעה שגיאה בעיבוד הבקשה.";
+      // Mark user messages as read
+      const userMsgsQuery = query(
+        collection(db, 'chats', chatId, 'messages'),
+        where('senderId', '==', user.uid),
+        where('status', '==', 'sent')
+      );
       
-      // Mark user messages as read once Noa finishes processing
-      await markMessagesAsRead();
+      getDocs(userMsgsQuery).then(snapshot => {
+        snapshot.forEach(d => {
+          updateDoc(doc(db, 'chats', chatId, 'messages', d.id), { status: 'read' });
+        });
+      });
+
+      const reply = await processNoaTurn(userText, user) || "סליחה, אירעה שגיאה בעיבוד הבקשה.";
       
       // Simulate delay for natural feel
       setTimeout(async () => {
@@ -909,58 +770,6 @@ export default function App() {
                 )} />
               </div>
 
-              <div 
-                onClick={() => handleActiveViewChange('warehouse')}
-                className={cn(
-                  "flex items-center px-4 py-3 gap-3 cursor-pointer hover:bg-[#f0f2f5] transition-all border-b border-gray-100 group active:bg-gray-200",
-                  activeView === 'warehouse' && "bg-[#f0f2f5] border-r-4 border-[#00a884] shadow-inner"
-                )}
-              >
-                <div className={cn(
-                  "w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors shadow-sm",
-                  activeView === 'warehouse' ? "bg-[#00a884] text-white" : "bg-white text-[#00a884] group-hover:bg-[#00a884] group-hover:text-white border border-[#00a884]/20"
-                )}>
-                  <Warehouse className="w-6 h-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className={cn(
-                    "text-sm font-semibold truncate",
-                    activeView === 'warehouse' ? "text-[#00a884]" : "text-[#111b21]"
-                  )}>דשבורד מחסנים</h3>
-                  <p className="text-[11px] text-gray-400 truncate">ניהול העמסה לפי חלוקת מחסנים</p>
-                </div>
-                <ChevronLeft className={cn(
-                  "w-4 h-4 transition-all opacity-0 group-hover:opacity-100",
-                  activeView === 'warehouse' ? "text-[#00a884] opacity-100" : "text-gray-300"
-                )} />
-              </div>
-
-              <div 
-                onClick={() => handleActiveViewChange('staff')}
-                className={cn(
-                  "flex items-center px-4 py-3 gap-3 cursor-pointer hover:bg-[#f0f2f5] transition-all border-b border-gray-100 group active:bg-gray-200",
-                  activeView === 'staff' && "bg-[#f0f2f5] border-r-4 border-r-[#00a884] shadow-inner"
-                )}
-              >
-                <div className={cn(
-                  "w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors shadow-sm",
-                  activeView === 'staff' ? "bg-[#111b21] text-white" : "bg-white text-[#54656f] group-hover:bg-[#111b21] group-hover:text-white border border-gray-100"
-                )}>
-                  <Users className="w-6 h-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className={cn(
-                    "text-sm font-semibold truncate",
-                    activeView === 'staff' ? "text-[#111b21]" : "text-[#111b21]"
-                  )}>הגדרות צוות</h3>
-                  <p className="text-[11px] text-gray-400 truncate">ניהול פרופילים וקופסה שחורה</p>
-                </div>
-                <ChevronLeft className={cn(
-                  "w-4 h-4 transition-all opacity-0 group-hover:opacity-100",
-                  activeView === 'staff' ? "text-[#111b21] opacity-100" : "text-gray-300"
-                )} />
-              </div>
-
               <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 italic text-[10px] text-gray-400 font-bold tracking-widest uppercase shrink-0">
                  צוותים פעילים
               </div>
@@ -1020,7 +829,7 @@ export default function App() {
 
       {/* Main Area */}
       <AnimatePresence mode="wait">
-        {(!isMobile || activeView === 'chat' || activeView === 'history' || activeView === 'warehouse') && (
+        {(!isMobile || activeView === 'chat' || activeView === 'history') && (
           <motion.div 
             key={activeView}
             initial={isMobile ? { x: "-100%" } : { opacity: 0 }}
@@ -1032,12 +841,8 @@ export default function App() {
             {activeView === 'history' ? (
               <OrderHistory 
                 onBack={() => handleActiveViewChange(isMobile ? 'sidebar' : 'chat')} 
-                selectedOrderId={historyOrderId || undefined} 
+                selectedOrderId={historyOrderId || undefined}
               />
-            ) : activeView === 'warehouse' ? (
-              <WarehouseDashboard onBack={() => handleActiveViewChange(isMobile ? 'sidebar' : 'chat')} />
-            ) : activeView === 'staff' ? (
-              <StaffSettings onBack={() => handleActiveViewChange(isMobile ? 'sidebar' : 'chat')} />
             ) : (
               <>
                 <Header 
@@ -1047,7 +852,9 @@ export default function App() {
                   isMobile={isMobile}
                   onBack={isMobile ? () => handleActiveViewChange('sidebar') : undefined}
                 />
-                <NoaChat
+            
+                {/* Messages List (NoaChat) */}
+                <NoaChat 
                   messages={messages} 
                   isNoaTyping={isNoaTyping} 
                   user={user} 

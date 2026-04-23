@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, 
-  CalendarIcon, X, Filter, 
+  Calendar, 
   ChevronLeft,
   ArrowUpDown,
   Clock,
@@ -20,10 +20,7 @@ import {
 import { db } from '../lib/firebase';
 import { Order } from '../types';
 import { cn } from '../lib/utils';
-import { getCustomerDisplay, getItemsDisplay } from '../lib/orderUtils';
-import { format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
-import { DayPicker, DateRange } from 'react-day-picker';
-import 'react-day-picker/dist/style.css';
+import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 
 interface OrderHistoryProps {
@@ -38,8 +35,6 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack
   const [searchTerm, setSearchTerm] = useState(selectedOrderId || '');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
-  const [showCalendar, setShowCalendar] = useState(false);
 
   useEffect(() => {
     if (selectedOrderId) {
@@ -50,34 +45,22 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack
 
   useEffect(() => {
     fetchOrders();
-  }, [statusFilter, sortOrder, dateRange]);
+  }, [statusFilter, sortOrder]);
 
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      let ordersRef = collection(db, 'orders');
-      let q = query(ordersRef, orderBy('createdAt', sortOrder));
+      let q = query(collection(db, 'orders'), orderBy('createdAt', sortOrder));
       
       if (statusFilter !== 'all') {
-        q = query(ordersRef, where('status', '==', statusFilter), orderBy('createdAt', sortOrder));
+        q = query(collection(db, 'orders'), where('status', '==', statusFilter), orderBy('createdAt', sortOrder));
       }
 
       const snapshot = await getDocs(q);
-      let ordersData = snapshot.docs.map(doc => ({
+      const ordersData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Order[];
-
-      if (dateRange?.from) {
-        const fromDate = startOfDay(dateRange.from);
-        const toDate = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
-        
-        ordersData = ordersData.filter(order => {
-          if (!order.createdAt) return false;
-          const orderDate = order.createdAt.toDate();
-          return isWithinInterval(orderDate, { start: fromDate, end: toDate });
-        });
-      }
       
       setOrders(ordersData);
     } catch (error) {
@@ -88,7 +71,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack
   };
 
   const filteredOrders = orders.filter(order => {
-    const customer = getCustomerDisplay(order).toLowerCase();
+    const customer = (order.customerName || order.customer || '').toLowerCase();
     const destination = (order.destination || '').toLowerCase();
     const orderId = (order.id || '').toLowerCase();
     const term = searchTerm.toLowerCase();
@@ -119,69 +102,11 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack
           <h2 className="text-lg font-bold text-[#111b21]">היסטוריית הזמנות</h2>
         </div>
         <div className="flex gap-2">
-           <button 
-             onClick={() => setShowCalendar(!showCalendar)} 
-             className={cn(
-               "p-2 hover:bg-gray-200 rounded-full transition-colors leading-none relative",
-               (dateRange?.from) ? "text-[#00a884] bg-[#00a884]/10" : "text-[#54656f]"
-             )}
-           >
-             <CalendarIcon className="w-5 h-5" />
-             {dateRange?.from && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#00a884] rounded-full border border-white" />}
-           </button>
            <button onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-[#54656f]">
              <ArrowUpDown className="w-5 h-5" />
            </button>
         </div>
       </header>
-
-      {showCalendar && (
-        <div className="bg-white border-b border-gray-200 p-4 shadow-inner">
-          <div className="flex justify-between items-center mb-4">
-            <div className="text-xs font-bold text-gray-500 flex items-center gap-1">
-              <Filter className="w-3 h-3" />
-              סינון לפי תאריך
-            </div>
-            <div className="flex gap-2">
-              {dateRange?.from && (
-                <button 
-                  onClick={() => setDateRange(undefined)}
-                  className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded-md hover:bg-red-100 transition-colors flex items-center gap-1"
-                >
-                  <X className="w-3 h-3" />
-                  נקה סינון
-                </button>
-              )}
-              <button 
-                onClick={() => setShowCalendar(false)}
-                className="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded-md hover:bg-gray-200 transition-colors"
-              >
-                סגור
-              </button>
-            </div>
-          </div>
-          
-          <div className="flex justify-center calendar-wrapper">
-            <DayPicker
-              mode="range"
-              selected={dateRange}
-              onSelect={setDateRange}
-              locale={he}
-              dir="rtl"
-              className="rdp-custom"
-            />
-          </div>
-          
-          {dateRange?.from && (
-            <div className="mt-4 text-center">
-              <div className="text-[11px] text-[#00a884] font-medium bg-[#00a884]/5 py-2 px-4 rounded-lg inline-block">
-                מציג הזמנות מתיאריך: {format(dateRange.from, 'dd/MM/yyyy')} 
-                {dateRange.to ? ' עד: ' + format(dateRange.to, 'dd/MM/yyyy') : ''}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="p-4 space-y-4 shrink-0 border-b border-gray-100 shadow-sm">
         <div className="relative">
@@ -238,10 +163,10 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="font-bold text-[#111b21] group-hover:text-[#00a884] transition-colors">
-                      {getCustomerDisplay(order)}
+                      {order.customerName || order.customer || 'לקוח ללא שם'}
                     </h3>
                     <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-1">
-                      <CalendarIcon className="w-3 h-3" />
+                      <Calendar className="w-3 h-3" />
                       {order.createdAt ? format(order.createdAt.toDate(), 'dd/MM/yyyy HH:mm', { locale: he }) : 'תאריך לא ידוע'}
                     </div>
                   </div>
@@ -257,7 +182,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ onOrderClick, onBack
                   <div className="flex items-start gap-2 text-[13px] text-gray-600 px-0.5">
                     <Package className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                     <span className="line-clamp-1 italic text-gray-500">
-                      {getItemsDisplay(order.items)}
+                      {Array.isArray(order.items) ? order.items.join(', ') : order.items}
                     </span>
                   </div>
 
