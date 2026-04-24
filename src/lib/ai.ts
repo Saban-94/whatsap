@@ -1,12 +1,14 @@
 import { GoogleGenAI, FunctionDeclaration, Type } from "@google/genai";
 
-const apiKey = process.env.GEMINI_API_KEY;
+// שינוי קריטי עבור Vite ו-Vercel
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
 if (!apiKey) {
   console.warn("GEMINI_API_KEY is not set. AI features will be disabled.");
 }
 
 export const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+
 
 export const searchOrdersTool: FunctionDeclaration = {
   name: "search_orders",
