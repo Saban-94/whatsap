@@ -11,6 +11,11 @@ const debugConfig = {
 
 console.log("🛠️ SabanOS Debug - בדיקת חיבור Firebase:", debugConfig);
 console.log("🌐 דומיין נוכחי (Domain):", window.location.hostname);
+console.log("📋 Raw env values:", {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY?.substring(0, 10) + "...",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+});
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
